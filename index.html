@@ -20,7 +20,6 @@
         .box.ausfall-mode .klasse { color: #777777; }
         .box.ausfall-mode .res { color: #555555; }
 
-        /* STIFT RECHTS OBEN */
         .stift { 
             position: absolute; 
             top: 2px;          
@@ -119,6 +118,13 @@
             
             const container = document.getElementById('plan');
             const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
+            const heute = new Date(); heute.setHours(12,0,0,0);
+            const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
+            
+            // PRÜFUNG DER ZEITRÄUME MIT DEINEN ORIGINAL-SÄTZEN
+            if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+            if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+            if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
             
             try {
                 const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
