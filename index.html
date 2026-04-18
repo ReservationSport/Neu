@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Reservation Sport</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; }
         .grid { display: grid; grid-template-columns: 120px repeat(5, 1fr); gap: 2px; max-width: 1000px; margin: auto; }
@@ -20,20 +21,19 @@
         .box.ausfall-mode .klasse { color: #777777; }
         .box.ausfall-mode .res { color: #555555; }
 
+        /* MODERNES ICON OBEN RECHTS */
         .stift { 
             position: absolute; 
-            top: 2px;          
-            right: 2px;         
+            top: 3px;          
+            right: 4px;         
             z-index: 50; 
             color: #e67e22; 
             cursor: pointer; 
             pointer-events: auto; 
             display: inline-block; 
-            font-size: 18px;    
+            font-size: 16px;    /* Etwas kleiner für die Sprechblase */
             line-height: 1;     
-            background: rgba(0,0,0,0.4); 
-            padding: 2px 4px;   
-            border-radius: 3px;  
+            text-shadow: 0 0 3px rgba(0,0,0,0.8);
         }
 
         .zeit-box { background: #333; font-weight: bold; cursor: default; }
@@ -91,7 +91,6 @@
             if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
         });
 
-        // HIER WIRD DIE NAV-BUTTON LOGIK AKTUALISIERT
         function updateNavButtons() {
             const dp = document.getElementById('datePicker');
             const currentDate = new Date(dp.value); currentDate.setHours(12, 0, 0, 0);
@@ -160,7 +159,8 @@
                         for(let i = 1; i <= 5; i++) {
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
-                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')">✎</span>` : "";
+                            // MODERNES ICON STATT STIFT
+                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
 
                             container.innerHTML += `
                             <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" 
@@ -217,7 +217,8 @@
                 const text = prompt("Kommentar:"); 
                 if(text) { 
                     const s = parent.querySelector('.stift'); if (s) s.remove();
-                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')">✎</span>`;
+                    // NEUES ICON AUCH HIER BEIM NEU-ANLEGEN
+                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
                     pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + pureRes + " | KOMMENTAR:" + text }); 
                 } 
             }
