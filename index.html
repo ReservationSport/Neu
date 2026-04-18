@@ -39,6 +39,8 @@
 
         .zeit-box { background: #333; font-weight: bold; cursor: default; }
         .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
+        
+        /* Style für Wochenende und Sperrtage */
         .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
@@ -84,7 +86,9 @@
     <div class="grid" id="plan"></div>
 
     <script>
-        const url = "HIER_DEINE_SCRIPT_URL_EINTRAGEN"; 
+        // Deine aktive URL eingetragen:
+        const url = "https://script.google.com/macros/s/AKfycbyhu-wwwLc7b_ZrkVKj8QdLZWK17_ih2czN5ojd3yUXwPrjIRzsYUvxcnzln7I2I57c6Q/exec"; 
+        
         let pendingChanges = [], configFarben = {}, userPw = "", pressTimer;
         let currentPlanData = []; 
         let lastStableDate = ""; 
@@ -150,7 +154,7 @@
                 const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
                 const json = await res.json();
 
-                // SPERRZEITEN-HANDLING (Exakt gleicher Style wie Wochenende)
+                // SPERRZEITEN-HANDLING (Gleicher Style wie Wochenende)
                 if (json.error === "SPERRE") {
                     container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
                     document.getElementById('globalLoader').style.display = 'none';
