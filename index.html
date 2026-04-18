@@ -21,7 +21,7 @@
         .box.ausfall-mode .klasse { color: #777777; }
         .box.ausfall-mode .res { color: #555555; }
 
-        /* DEUTLICH GRÖSSERES ICON OBEN RECHTS */
+        /* GROSSES ICON OBEN RECHTS */
         .stift { 
             position: absolute; 
             top: 2px;          
@@ -31,15 +31,12 @@
             cursor: pointer; 
             pointer-events: auto; 
             display: inline-block; 
-            font-size: 22px;    /* Deutlich vergrößert */
+            font-size: 22px;    
             line-height: 1;     
-            text-shadow: 0 0 5px rgba(0,0,0,1); /* Stärkerer Schatten für bessere Lesbarkeit */
+            text-shadow: 0 0 5px rgba(0,0,0,1); 
             transition: transform 0.2s ease;
         }
-        .stift:hover {
-            transform: scale(1.2); /* Wird beim Drüberfahren noch ein Stück größer */
-            color: #ff9f43;
-        }
+        .stift:hover { transform: scale(1.2); color: #ff9f43; }
 
         .zeit-box { background: #333; font-weight: bold; cursor: default; }
         .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
@@ -134,9 +131,10 @@
             if (!userPw || !dateVal) return;
             
             updateNavButtons();
+            const container = document.getElementById('plan');
+            container.innerHTML = ""; // Plan sofort leeren
             document.getElementById('globalLoader').style.display = 'block';
             
-            const container = document.getElementById('plan');
             const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
             const heute = new Date(); heute.setHours(12,0,0,0);
             const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
@@ -148,7 +146,8 @@
             try {
                 const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
                 const json = await res.json();
-                container.innerHTML = ""; pendingChanges = [];
+                container.innerHTML = ""; 
+                pendingChanges = [];
                 currentPlanData = json.data; 
                 const data = json.data, options = json.options;
                 configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
