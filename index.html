@@ -140,4 +140,113 @@
             document.getElementById('globalLoader').style.display = 'block';
             const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
             const heute = new Date(); heute.setHours(12,0,0,0);
-            const vierWochen = new Date(); vierWochen.setDate(heute
+            const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
+            if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+            if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+            if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+            try {
+                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
+                const json = await res.json();
+                container.innerHTML = ""; pendingChanges = [];
+                currentPlanData = json.data; 
+                const data = json.data, options = json.options;
+                configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
+                const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+                const [y, m, d] = dateVal.split('-').map(Number);
+                data.forEach((row, rowIndex) => {
+                    if (rowIndex === 0) container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+                    else {
+                        if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
+                        if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
+                        container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
+                        for(let i = 1; i <= 5; i++) {
+                            let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
+                            let isAusfall = (res === "Ausfall");
+                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
+                            container.innerHTML += `
+                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" 
+                                 data-row="${rowIndex}" data-col="${i}"
+                                 oncontextmenu="handleContextMenu(event, this)" ontouchstart="startTimer(this)" ontouchend="clearTimer()" style="background-color: ${isAusfall ? '' : configFarben[res] || ''}">
+                                ${stiftHtml}
+                                <div class="klasse">${klasse}</div>
+                                <div class="res">${res}</div>
+                                <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
+                                    <option value="">---</option>${options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                                </select>
+                                <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
+                                    <option value="">---</option><option value="ausfall">Ausfall</option><option value="kommentar">Kommentar</option>
+                                </select>
+                            </div>`;
+                        }
+                    }
+                });
+            } catch(e) { console.error(e); }
+            document.getElementById('globalLoader').style.display = 'none';
+        }
+
+        function getExistingComment(r, c) {
+            let val = (currentPlanData[r] && currentPlanData[r][c]) ? currentPlanData[r][c] : "";
+            let teile = val.split(' | ');
+            return (teile[2] && teile[2].startsWith("KOMMENTAR:")) ? teile[2] : "";
+        }
+
+        window.addChange = (el, time, slot, klasse) => { 
+            let res = el.value; const parent = el.parentElement;
+            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+            parent.classList.remove('ausfall-mode');
+            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
+            parent.style.backgroundColor = configFarben[res] || ""; 
+            let comment = getExistingComment(r, c);
+            let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
+            if (comment) finalVal += " | " + comment;
+            pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
+            document.getElementById('saveBtn').style.display = 'block';
+        };
+
+        window.handleExtraAction = (el, time, slot) => {
+            const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
+            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+            let pureRes = parent.querySelector('.res').innerText.trim();
+            if (action === "ausfall") { 
+                parent.classList.add('ausfall-mode'); parent.style.backgroundColor = "";
+                parent.querySelector('.res').innerText = "Ausfall"; 
+                let comment = getExistingComment(r, c);
+                let finalVal = klasse + " | Ausfall" + (comment ? " | " + comment : "");
+                pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
+            } else if (action === "kommentar") { 
+                const text = prompt("Kommentar:"); 
+                if(text) { 
+                    const s = parent.querySelector('.stift'); if (s) s.remove();
+                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
+                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + pureRes + " | KOMMENTAR:" + text }); 
+                } 
+            }
+            document.getElementById('saveBtn').style.display = 'block'; closeAllExtraMenus(); el.value = "";
+        };
+
+        window.startTimer = (el) => { pressTimer = setTimeout(() => { closeAllExtraMenus(); openExtraMenu(el); }, 500); };
+        window.clearTimer = () => clearTimeout(pressTimer);
+        window.handleContextMenu = (e, el) => { e.preventDefault(); closeAllExtraMenus(); openExtraMenu(el); };
+        function openExtraMenu(el) { const sel = el.querySelector('.extra-select'); sel.style.zIndex = "100"; sel.style.pointerEvents = "all"; sel.style.opacity = "1"; setTimeout(() => { if (sel.showPicker) { sel.showPicker(); } else { sel.click(); } }, 50); }
+        
+        window.saveChanges = async () => { 
+            const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
+            btn.style.display = 'none'; ball.classList.add('active');
+            try { 
+                await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) }); 
+                pendingChanges = []; ball.classList.remove('active'); 
+                btn.innerText = "Gespeichert!"; btn.classList.add('success'); btn.style.display = 'block'; 
+                setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; loadPlan(); }, 1000); 
+            } catch (e) { ball.classList.remove('active'); btn.style.display = 'block'; btn.innerText = "Fehler!"; }
+        };
+
+        window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
+        document.addEventListener('DOMContentLoaded', () => { 
+            const today = new Date(); const offset = today.getTimezoneOffset(); today.setMinutes(today.getMinutes() - offset); 
+            const dateStr = today.toISOString().split('T')[0];
+            document.getElementById('datePicker').value = dateStr;
+            lastStableDate = dateStr;
+        });
+    </script>
+</body>
+</html>
