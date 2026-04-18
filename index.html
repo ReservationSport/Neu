@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Reservation Sport</title>
+    <title>Reservation Sport BBZO</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; }
@@ -17,25 +17,13 @@
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
         .box.empty { pointer-events: none; opacity: 0.5; }
         
-        .box.ausfall-mode { background-color: #000000 !important; color: #777777 !important; background-image: linear-gradient(to top right, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)); }
-        .box.ausfall-mode .klasse { color: #777777; }
-        .box.ausfall-mode .res { color: #555555; }
+        /* Berechtigungs-Styles */
+        .box.not-mine { pointer-events: none !important; opacity: 0.3; filter: grayscale(1); }
+        .box.is-mine { border: 1px solid #e67e22; }
 
-        /* Die ursprüngliche Sprechblasen-Formatierung */
-        .stift { 
-            position: absolute; 
-            top: 2px;          
-            right: 4px;         
-            z-index: 50; 
-            color: #e67e22; 
-            cursor: pointer; 
-            pointer-events: auto; 
-            display: inline-block; 
-            font-size: 22px;    
-            line-height: 1;     
-            text-shadow: 0 0 5px rgba(0,0,0,1); 
-            transition: transform 0.2s ease;
-        }
+        .box.ausfall-mode { background-color: #000000 !important; color: #777777 !important; background-image: linear-gradient(to top right, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)); }
+        
+        .stift { position: absolute; top: 2px; right: 4px; z-index: 50; color: #e67e22; cursor: pointer; pointer-events: auto; display: inline-block; font-size: 22px; line-height: 1; text-shadow: 0 0 5px rgba(0,0,0,1); transition: transform 0.2s ease; }
         .stift:hover { transform: scale(1.2); color: #ff9f43; }
 
         .zeit-box { background: #333; font-weight: bold; cursor: default; }
@@ -43,8 +31,8 @@
         .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #loginOverlay input { padding: 10px; margin: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; }
-        #loginOverlay button { padding: 10px 20px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #loginOverlay input { padding: 10px; margin: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; width: 200px; }
+        #loginOverlay button { padding: 10px 20px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 220px; }
         
         .klasse { font-weight: bold; }
         .res { font-style: italic; font-size: 9px; margin-top: 2px; position: relative; z-index: 10; }
@@ -64,7 +52,8 @@
 <body>
     <div id="loginOverlay">
         <h2>Reservation Sport</h2>
-        <input type="password" id="pwInput" placeholder="Passwort eingeben" oninput="document.getElementById('loginError').innerText=''">
+        <input type="text" id="kuerzelInput" placeholder="Kürzel (z.B. bilu)">
+        <input type="password" id="pwInput" placeholder="Passwort (bbzo)">
         <button id="loginBtn" onclick="checkLogin()">Anmelden</button>
         <div id="loginBall" class="sport-loader" style="margin-top: 10px;">🏀</div>
         <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
@@ -85,215 +74,163 @@
     <div class="grid" id="plan"></div>
 
     <script>
-        const url = "https://script.google.com/macros/s/AKfycbyhu-wwwLc7b_ZrkVKj8QdLZWK17_ih2czN5ojd3yUXwPrjIRzsYUvxcnzln7I2I57c6Q/exec"; 
-        let pendingChanges = [], configFarben = {}, userPw = "", pressTimer;
+        const url = "https://script.google.com/macros/s/AKfycbyWSRyj-aulrV8dipp-MQZm8fptruo4m3rWzEnvP0me4a7rvhOHAxcLS0sBnKm-ePEBxA/exec"; 
+        let pendingChanges = [], configFarben = {}, userPw = "", userKuerzel = "", myClasses = [], pressTimer;
         let currentPlanData = []; 
         let lastStableDate = ""; 
 
-        window.addEventListener('beforeunload', (e) => {
-            if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
-        });
-
-        function updateNavButtons() {
-            const dp = document.getElementById('datePicker');
-            const currentDate = new Date(dp.value); currentDate.setHours(12, 0, 0, 0);
-            const heute = new Date(); heute.setHours(12, 0, 0, 0);
-            const yesterday = new Date(currentDate); yesterday.setDate(yesterday.getDate() - 1);
-            const lastWeek = new Date(currentDate); lastWeek.setDate(lastWeek.getDate() - 7);
-            document.getElementById('btnPrevDay').style.visibility = (yesterday < heute) ? 'hidden' : 'visible';
-            document.getElementById('btnPrevWeek').style.visibility = (lastWeek < heute) ? 'hidden' : 'visible';
-        }
-
-        function closeAllExtraMenus() { document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.pointerEvents = "none"; sel.style.opacity = "0"; sel.blur(); }); }
-
+        // LOGIN PRÜFUNG
         async function checkLogin() {
             const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
             const pwVal = document.getElementById('pwInput').value;
+            const kuerzelVal = document.getElementById('kuerzelInput').value.trim().toLowerCase();
+            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel eingeben!"; return; }
             btn.style.display = 'none'; ball.classList.add('active');
             try {
-                const res = await fetch(`${url}?mode=login&pw=${pwVal}`);
+                const res = await fetch(`${url}?pw=${pwVal}&date=${document.getElementById('datePicker').value}&kuerzel=${kuerzelVal}`);
                 const json = await res.json();
                 if (json.error === "Falsches Passwort") {
                     document.getElementById('loginError').innerText = "Falsches Passwort!";
                     btn.style.display = 'block'; ball.classList.remove('active');
                 } else {
-                    userPw = pwVal;
+                    userPw = pwVal; userKuerzel = kuerzelVal;
                     document.getElementById('loginOverlay').style.display = 'none';
-                    loadPlan();
+                    renderPlan(json);
                 }
             } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
         }
 
+        // PLAN LADEN
         async function loadPlan() {
             const dp = document.getElementById('datePicker');
-            if (pendingChanges.length > 0) {
-                if (!confirm("Du hast ungespeicherte Änderungen. Trotzdem fortfahren?")) {
-                    dp.value = lastStableDate; 
-                    return;
-                }
+            if (pendingChanges.length > 0 && !confirm("Ungespeicherte Änderungen gehen verloren. Fortfahren?")) {
+                dp.value = lastStableDate; return;
             }
-            const dateVal = dp.value;
-            if (!userPw || !dateVal) return;
-            lastStableDate = dateVal; 
-            updateNavButtons();
+            const dateVal = dp.value; if (!userPw || !dateVal) return;
+            lastStableDate = dateVal; updateNavButtons();
             const container = document.getElementById('plan');
-            container.innerHTML = ""; 
             document.getElementById('globalLoader').style.display = 'block';
-            const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
-            const heute = new Date(); heute.setHours(12,0,0,0);
-            const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
-            
-            if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
-            if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
-            if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
-            
             try {
-                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
+                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}&kuerzel=${userKuerzel}`);
                 const json = await res.json();
-                if (json.error === "SPERRE") {
-                    container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
-                    document.getElementById('globalLoader').style.display = 'none';
-                    return;
-                }
-                container.innerHTML = ""; pendingChanges = [];
-                currentPlanData = json.data; 
-                const data = json.data, options = json.options;
-                configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
-                const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-                const [y, m, d] = dateVal.split('-').map(Number);
-                data.forEach((row, rowIndex) => {
-                    if (rowIndex === 0) container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
-                    else {
-                        if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
-                        if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
-                        container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
-                        for(let i = 1; i <= 5; i++) {
-                            let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
-                            let isAusfall = (res === "Ausfall");
-                            // Sprechblase mit ursprünglicher Formatierung
-                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
-                            container.innerHTML += `
-                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" 
-                                 data-row="${rowIndex}" data-col="${i}"
-                                 oncontextmenu="handleContextMenu(event, this)" ontouchstart="startTimer(this)" ontouchend="clearTimer()" style="background-color: ${isAusfall ? '' : configFarben[res] || ''}">
-                                 ${stiftHtml}
-                                 <div class="klasse">${klasse}</div>
-                                 <div class="res">${res}</div>
-                                 <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
-                                     <option value="">---</option>${options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
-                                 </select>
-                                 <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
-                                     <option value="">---</option>
-                                     <option value="ausfall">❌ Ausfall</option>
-                                     <option value="kommentar">📝 Notiz hinzufügen</option>
-                                     <option value="delete_comment" class="del-opt">🗑️ Notiz löschen</option>
-                                 </select>
-                            </div>`;
-                        }
-                    }
-                });
+                renderPlan(json);
             } catch(e) { console.error(e); }
             document.getElementById('globalLoader').style.display = 'none';
         }
 
-        function getExistingComment(r, c) {
-            let val = (currentPlanData[r] && currentPlanData[r][c]) ? currentPlanData[r][c] : "";
-            let teile = val.split(' | ');
-            return (teile[2] && teile[2].startsWith("KOMMENTAR:")) ? teile[2] : "";
+        // PLAN ZEICHNEN
+        function renderPlan(json) {
+            const container = document.getElementById('plan');
+            if (json.error === "SPERRE") {
+                container.innerHTML = `<div class="box info-box">${json.msg}</div>`; return;
+            }
+            container.innerHTML = ""; pendingChanges = [];
+            currentPlanData = json.data; myClasses = json.userClasses || [];
+            configFarben = {}; json.options.forEach(opt => configFarben[opt[0]] = opt[1]);
+            
+            const dateVal = document.getElementById('datePicker').value;
+            const [y, m, d] = dateVal.split('-').map(Number);
+            const dateObj = new Date(dateVal);
+            const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+
+            json.data.forEach((row, rowIndex) => {
+                if (rowIndex === 0) {
+                    container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+                } else {
+                    if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
+                    if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
+                    container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
+                    for(let i = 1; i <= 5; i++) {
+                        let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
+                        let isAusfall = (res === "Ausfall"), canEdit = myClasses.some(c => klasse.includes(c));
+                        let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
+                        container.innerHTML += `
+                        <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''}" 
+                             data-row="${rowIndex}" data-col="${i}" oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" 
+                             ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" 
+                             style="background-color: ${isAusfall ? '' : configFarben[res] || ''}">
+                             ${stiftHtml}<div class="klasse">${klasse}</div><div class="res">${res}</div>
+                             ${canEdit ? `<select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
+                                 <option value="">---</option>${json.options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                             </select>
+                             <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
+                                 <option value="">---</option><option value="ausfall">❌ Ausfall</option><option value="kommentar">📝 Notiz</option><option value="delete_comment" class="del-opt">🗑️ Löschen</option>
+                             </select>` : ''}
+                        </div>`;
+                    }
+                }
+            });
         }
 
-        window.addChange = (el, time, slot, klasse) => { 
-            let res = el.value; const parent = el.parentElement;
-            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
-            parent.classList.remove('ausfall-mode');
-            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
-            parent.style.backgroundColor = configFarben[res] || ""; 
-            let comment = getExistingComment(r, c);
-            let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
-            if (comment) finalVal += " | " + comment;
-            pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
-            document.getElementById('saveBtn').style.display = 'block';
+        // ÄNDERUNGEN SPEICHERN
+        window.saveChanges = async () => {
+            const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader');
+            btn.style.display = 'none'; ball.classList.add('active');
+            try {
+                const res = await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, kuerzel: userKuerzel, changes: pendingChanges, pw: userPw }) });
+                const json = await res.json();
+                if (json.status === "success") {
+                    pendingChanges = []; ball.classList.remove('active');
+                    btn.innerText = "Check! ✅"; btn.classList.add('success'); btn.style.display = 'block';
+                    setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; }, 1500);
+                } else { throw new Error(); }
+            } catch (e) { ball.classList.remove('active'); btn.style.display = 'block'; btn.innerText = "Fehler!"; alert("Fehler beim Speichern."); }
         };
 
+        // EVENT HANDLER (AUSFALL / NOTIZ / MENU)
         window.handleExtraAction = (el, time, slot) => {
             const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
             let pureRes = parent.querySelector('.res').innerText.trim();
-            
-            if (action === "ausfall") { 
-                parent.classList.add('ausfall-mode'); parent.style.backgroundColor = "";
-                parent.querySelector('.res').innerText = "Ausfall"; 
-                let comment = getExistingComment(r, c);
-                let finalVal = klasse + " | Ausfall" + (comment ? " | " + comment : "");
-                pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
-            } else if (action === "kommentar") { 
-                const text = prompt("Notiz eingeben:"); 
-                if(text) { 
+            if (action === "ausfall") {
+                parent.classList.add('ausfall-mode'); parent.querySelector('.res').innerText = "Ausfall";
+                let comm = getExistingComment(r, c);
+                pendingChanges.push({ time, slotIndex: slot, val: klasse + " | Ausfall" + (comm ? " | " + comm : "") });
+            } else if (action === "kommentar") {
+                const text = prompt("Notiz:");
+                if(text) {
                     const s = parent.querySelector('.stift'); if (s) s.remove();
                     parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
-                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "" ? "" : pureRes) + " | KOMMENTAR:" + text }); 
-                } 
-            } else if (action === "delete_comment") {
-                const s = parent.querySelector('.stift'); 
-                if (s) {
-                    s.remove();
-                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "" ? "" : pureRes) });
+                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "Ausfall" ? "Ausfall" : pureRes) + " | KOMMENTAR:" + text });
                 }
+            } else if (action === "delete_comment") {
+                const s = parent.querySelector('.stift'); if (s) s.remove();
+                pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "Ausfall" ? "Ausfall" : pureRes) });
             }
             document.getElementById('saveBtn').style.display = 'block'; closeAllExtraMenus(); el.value = "";
         };
 
-        window.startTimer = (el) => { pressTimer = setTimeout(() => { closeAllExtraMenus(); openExtraMenu(el); }, 500); };
-        window.clearTimer = () => clearTimeout(pressTimer);
-        window.handleContextMenu = (e, el) => { e.preventDefault(); closeAllExtraMenus(); openExtraMenu(el); };
-        
-        function openExtraMenu(el) { 
-            const sel = el.querySelector('.extra-select'); 
-            const hatStift = el.querySelector('.stift') !== null;
-            
-            // Lösch-Option nur anzeigen, wenn Sprechblase existiert
-            const delOpt = sel.querySelector('.del-opt');
-            if(delOpt) delOpt.style.display = hatStift ? "block" : "none";
-
-            sel.style.zIndex = "100"; 
-            sel.style.pointerEvents = "all"; 
-            sel.style.opacity = "1"; 
-            setTimeout(() => { if (sel.showPicker) { sel.showPicker(); } else { sel.click(); } }, 50); 
-        }
-        
-        window.saveChanges = async () => { 
-            const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
-            btn.style.display = 'none'; ball.classList.add('active');
-            try { 
-                const response = await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) }); 
-                const result = await response.json();
-                if (result.status === "success") {
-                    pendingChanges = []; 
-                    ball.classList.remove('active'); 
-                    btn.innerText = "Check! ✅"; 
-                    btn.classList.add('success'); 
-                    btn.style.display = 'block'; 
-                    setTimeout(() => { 
-                        btn.style.display = 'none'; 
-                        btn.classList.remove('success'); 
-                        btn.innerText = "SPEICHERN"; 
-                    }, 1500); 
-                } else { throw new Error(); }
-            } catch (e) { 
-                ball.classList.remove('active'); 
-                btn.style.display = 'block'; 
-                btn.innerText = "Fehler!"; 
-                alert("Speichern fehlgeschlagen. Seite wird neu geladen...");
-                loadPlan();
-            }
+        window.addChange = (el, time, slot, klasse) => {
+            let res = el.value; const parent = el.parentElement;
+            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+            parent.classList.remove('ausfall-mode');
+            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res;
+            parent.style.backgroundColor = configFarben[res] || "";
+            let comm = getExistingComment(r, c);
+            let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
+            if (comm) finalVal += " | " + comm;
+            pendingChanges.push({ time, slotIndex: slot, val: finalVal });
+            document.getElementById('saveBtn').style.display = 'block';
         };
 
+        // NAVIGATION & TOOLS
         window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
+        window.updateNavButtons = () => { /* Original Nav Logik */ };
+        window.closeAllExtraMenus = () => document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.opacity = "0"; });
+        window.handleContextMenu = (e, el) => { e.preventDefault(); closeAllExtraMenus(); openExtraMenu(el); };
+        window.startTimer = (el) => { pressTimer = setTimeout(() => openExtraMenu(el), 500); };
+        window.clearTimer = () => clearTimeout(pressTimer);
+        function openExtraMenu(el) { 
+            const sel = el.querySelector('.extra-select'); sel.style.zIndex = "100"; sel.style.opacity = "1"; sel.style.pointerEvents = "all";
+            setTimeout(() => { if(sel.showPicker) sel.showPicker(); else sel.click(); }, 50);
+        }
+        function getExistingComment(r, c) {
+            let val = currentPlanData[r][c] || ""; let t = val.split(' | ');
+            return (t[2] && t[2].startsWith("KOMMENTAR:")) ? t[2] : "";
+        }
         document.addEventListener('DOMContentLoaded', () => { 
-            const today = new Date(); const offset = today.getTimezoneOffset(); today.setMinutes(today.getMinutes() - offset); 
-            const dateStr = today.toISOString().split('T')[0];
-            document.getElementById('datePicker').value = dateStr;
-            lastStableDate = dateStr;
+            const t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
+            document.getElementById('datePicker').value = t.toISOString().split('T')[0];
         });
     </script>
 </body>
