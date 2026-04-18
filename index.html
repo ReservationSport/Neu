@@ -84,4 +84,162 @@
 
         // BROWSER-WARNUNG VOR DEM SCHLIESSEN
         window.addEventListener('beforeunload', (e) => {
-            if (pendingChanges.length >
+            if (pendingChanges.length > 0) {
+                e.preventDefault();
+                e.returnValue = ''; // Standard für moderne Browser
+            }
+        });
+
+        function closeAllExtraMenus() { document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.pointerEvents = "none"; sel.style.opacity = "0"; sel.blur(); }); }
+
+        async function checkLogin() {
+            const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
+            const pwVal = document.getElementById('pwInput').value;
+            btn.style.display = 'none'; ball.classList.add('active');
+            try {
+                const res = await fetch(`${url}?mode=login&pw=${pwVal}`);
+                const json = await res.json();
+                if (json.error === "Falsches Passwort") {
+                    document.getElementById('loginError').innerText = "Falsches Passwort!";
+                    btn.style.display = 'block'; ball.classList.remove('active');
+                } else {
+                    userPw = pwVal;
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    loadPlan();
+                }
+            } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
+        }
+
+        async function loadPlan() {
+            // NAVIGATION-WARNUNG INNERHALB DER SEITE
+            if (pendingChanges.length > 0) {
+                if (!confirm("Du hast ungespeicherte Änderungen. Wenn du fortfährst, gehen diese verloren. Trotzdem fortfahren?")) {
+                    return; 
+                }
+            }
+
+            const dateVal = document.getElementById('datePicker').value;
+            if (!userPw || !dateVal) return;
+            document.getElementById('globalLoader').style.display = 'block';
+            
+            const container = document.getElementById('plan');
+            const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
+            const heute = new Date(); heute.setHours(12,0,0,0);
+            const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
+            
+            if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Vergangenheit ist schreibgeschützt.</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+            if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Zeitraum zu weit in der Zukunft.</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+            if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Wochenende – keine Reservation möglich.</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+
+            try {
+                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
+                const json = await res.json();
+                container.innerHTML = ""; pendingChanges = [];
+                const data = json.data, options = json.options;
+                configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
+                const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+                const [y, m, d] = dateVal.split('-').map(Number);
+                
+                data.forEach((row, rowIndex) => {
+                    if (rowIndex === 0) container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+                    else {
+                        if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
+                        if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
+                        container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
+                        for(let i = 1; i <= 5; i++) {
+                            let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
+                            let isAusfall = (res === "Ausfall");
+                            
+                            let stiftHtml = "";
+                            if (kommentar.startsWith("KOMMENTAR:")) {
+                                let cText = kommentar.replace("KOMMENTAR:", "");
+                                stiftHtml = `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${cText}')">✎</span>`;
+                            }
+
+                            container.innerHTML += `
+                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" oncontextmenu="handleContextMenu(event, this)" ontouchstart="startTimer(event, this)" ontouchend="clearTimer()" style="background-color: ${isAusfall ? '' : configFarben[res] || ''}">
+                                ${stiftHtml}
+                                <div class="klasse">${klasse}</div>
+                                <div class="res">${res}</div>
+                                <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
+                                    <option value="">---</option>${options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                                </select>
+                                <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
+                                    <option value="">---</option><option value="ausfall">Ausfall</option><option value="kommentar">Kommentar</option>
+                                </select>
+                            </div>`;
+                        }
+                    }
+                });
+            } catch(e) { console.error(e); }
+            document.getElementById('globalLoader').style.display = 'none';
+        }
+
+        window.addChange = (el, time, slotIndex, klasse) => { 
+            let res = el.value; 
+            el.parentElement.classList.remove('ausfall-mode');
+            const parent = el.parentElement;
+            const resElement = parent.querySelector('.res');
+            resElement.innerText = (res === "" || res === "---") ? "" : res; 
+            el.parentElement.style.backgroundColor = configFarben[res] || ""; 
+            pendingChanges.push({ time, slotIndex, val: (res === "" || res === "---") ? klasse : klasse + " | " + res }); 
+            document.getElementById('saveBtn').style.display = 'block';
+        };
+
+        window.handleExtraAction = (el, time, slot) => {
+            const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
+            let pureRes = parent.querySelector('.res').innerText.trim();
+            if (action === "ausfall") { 
+                parent.classList.add('ausfall-mode'); parent.style.backgroundColor = "";
+                parent.querySelector('.res').innerText = "Ausfall"; 
+                const stift = parent.querySelector('.stift');
+                if (stift) stift.remove();
+                pendingChanges.push({ time, slotIndex: slot, val: klasse + " | Ausfall" }); 
+            } else if (action === "kommentar") { 
+                const text = prompt("Kommentar eingeben:"); 
+                if(text) { 
+                    const alterStift = parent.querySelector('.stift');
+                    if (alterStift) alterStift.remove();
+                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')">✎</span>`;
+                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + pureRes + " | KOMMENTAR:" + text }); 
+                } 
+            }
+            document.getElementById('saveBtn').style.display = 'block'; closeAllExtraMenus(); el.value = "";
+        };
+
+        window.startTimer = (e, el) => { pressTimer = setTimeout(() => { closeAllExtraMenus(); openExtraMenu(el); }, 500); };
+        window.clearTimer = () => clearTimeout(pressTimer);
+        window.handleContextMenu = (e, el) => { e.preventDefault(); closeAllExtraMenus(); openExtraMenu(el); };
+        function openExtraMenu(el) { const sel = el.querySelector('.extra-select'); sel.style.zIndex = "100"; sel.style.pointerEvents = "all"; sel.style.opacity = "1"; setTimeout(() => { if (sel.showPicker) { sel.showPicker(); } else { sel.click(); } }, 50); }
+        
+        window.saveChanges = async () => { 
+            const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
+            btn.style.display = 'none'; ball.classList.add('active');
+            try { 
+                await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) }); 
+                pendingChanges = []; 
+                ball.classList.remove('active'); 
+                btn.innerText = "Gespeichert!"; btn.classList.add('success'); btn.style.display = 'block'; 
+                setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; }, 1500); 
+            } catch (e) { 
+                ball.classList.remove('active'); btn.style.display = 'block'; btn.innerText = "Fehler!"; 
+            }
+        };
+
+        window.changeDate = (days) => { 
+            const dp = document.getElementById('datePicker'); 
+            let d = new Date(dp.value); 
+            d.setDate(d.getDate() + days); 
+            dp.valueAsDate = d; 
+            loadPlan(); 
+        };
+
+        document.addEventListener('DOMContentLoaded', () => { 
+            const today = new Date(); 
+            const offset = today.getTimezoneOffset(); 
+            today.setMinutes(today.getMinutes() - offset); 
+            document.getElementById('datePicker').value = today.toISOString().split('T')[0]; 
+        });
+    </script>
+</body>
+</html>
