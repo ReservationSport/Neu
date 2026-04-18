@@ -39,8 +39,6 @@
 
         .zeit-box { background: #333; font-weight: bold; cursor: default; }
         .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
-        
-        /* Style für Wochenende und Sperrtage */
         .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
@@ -86,9 +84,7 @@
     <div class="grid" id="plan"></div>
 
     <script>
-        // Deine aktive URL eingetragen:
         const url = "https://script.google.com/macros/s/AKfycbyhu-wwwLc7b_ZrkVKj8QdLZWK17_ih2czN5ojd3yUXwPrjIRzsYUvxcnzln7I2I57c6Q/exec"; 
-        
         let pendingChanges = [], configFarben = {}, userPw = "", pressTimer;
         let currentPlanData = []; 
         let lastStableDate = ""; 
@@ -153,14 +149,11 @@
             try {
                 const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
                 const json = await res.json();
-
-                // SPERRZEITEN-HANDLING (Gleicher Style wie Wochenende)
                 if (json.error === "SPERRE") {
                     container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
                     document.getElementById('globalLoader').style.display = 'none';
                     return;
                 }
-
                 container.innerHTML = ""; pendingChanges = [];
                 currentPlanData = json.data; 
                 const data = json.data, options = json.options;
@@ -247,11 +240,27 @@
             const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
             btn.style.display = 'none'; ball.classList.add('active');
             try { 
-                await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) }); 
-                pendingChanges = []; ball.classList.remove('active'); 
-                btn.innerText = "Gespeichert!"; btn.classList.add('success'); btn.style.display = 'block'; 
-                setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; loadPlan(); }, 1000); 
-            } catch (e) { ball.classList.remove('active'); btn.style.display = 'block'; btn.innerText = "Fehler!"; }
+                const response = await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) }); 
+                const result = await response.json();
+                if (result.status === "success") {
+                    pendingChanges = []; 
+                    ball.classList.remove('active'); 
+                    btn.innerText = "Check! ✅"; 
+                    btn.classList.add('success'); 
+                    btn.style.display = 'block'; 
+                    setTimeout(() => { 
+                        btn.style.display = 'none'; 
+                        btn.classList.remove('success'); 
+                        btn.innerText = "SPEICHERN"; 
+                    }, 1500); 
+                } else { throw new Error(); }
+            } catch (e) { 
+                ball.classList.remove('active'); 
+                btn.style.display = 'block'; 
+                btn.innerText = "Fehler!"; 
+                alert("Speichern fehlgeschlagen. Seite wird neu geladen...");
+                loadPlan();
+            }
         };
 
         window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
