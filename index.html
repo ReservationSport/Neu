@@ -17,11 +17,14 @@
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
         .box.empty { pointer-events: none; opacity: 0.5; }
         
+        /* Editierbarkeit & Rahmen */
+        .box.not-mine { pointer-events: none !important; } 
+        .box.is-mine { border: 2px solid #e67e22 !important; z-index: 10; box-shadow: inset 0 0 10px rgba(230,126,34,0.3); }
+
         .box.ausfall-mode { background-color: #000000 !important; color: #777777 !important; background-image: linear-gradient(to top right, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)); }
         .box.ausfall-mode .klasse { color: #777777; }
         .box.ausfall-mode .res { color: #555555; }
 
-        /* Die ursprüngliche Sprechblasen-Formatierung */
         .stift { 
             position: absolute; 
             top: 2px;          
@@ -43,8 +46,8 @@
         .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #loginOverlay input { padding: 10px; margin: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; }
-        #loginOverlay button { padding: 10px 20px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #loginOverlay input { padding: 10px; margin: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; width: 220px; }
+        #loginOverlay button { padding: 10px 20px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 240px; }
         
         .klasse { font-weight: bold; }
         .res { font-style: italic; font-size: 9px; margin-top: 2px; position: relative; z-index: 10; }
@@ -64,7 +67,8 @@
 <body>
     <div id="loginOverlay">
         <h2>Reservation Sport</h2>
-        <input type="password" id="pwInput" placeholder="Passwort eingeben" oninput="document.getElementById('loginError').innerText=''">
+        <input type="text" id="kuerzelInput" placeholder="Kürzel (z.B. bilu)" oninput="document.getElementById('loginError').innerText=''">
+        <input type="password" id="pwInput" placeholder="Passwort (bbzo)" oninput="document.getElementById('loginError').innerText=''">
         <button id="loginBtn" onclick="checkLogin()">Anmelden</button>
         <div id="loginBall" class="sport-loader" style="margin-top: 10px;">🏀</div>
         <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
@@ -86,9 +90,10 @@
 
     <script>
         const url = "https://script.google.com/macros/s/AKfycbyhu-wwwLc7b_ZrkVKj8QdLZWK17_ih2czN5ojd3yUXwPrjIRzsYUvxcnzln7I2I57c6Q/exec"; 
-        let pendingChanges = [], configFarben = {}, userPw = "", pressTimer;
+        let pendingChanges = [], configFarben = {}, userPw = "", userKuerzel = "", pressTimer;
         let currentPlanData = []; 
         let lastStableDate = ""; 
+        let myClasses = [];
 
         window.addEventListener('beforeunload', (e) => {
             if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
@@ -109,15 +114,20 @@
         async function checkLogin() {
             const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
             const pwVal = document.getElementById('pwInput').value;
+            const kuerzelVal = document.getElementById('kuerzelInput').value.trim().toLowerCase();
+            
+            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel fehlt!"; return; }
+            
             btn.style.display = 'none'; ball.classList.add('active');
             try {
-                const res = await fetch(`${url}?mode=login&pw=${pwVal}`);
+                const res = await fetch(`${url}?mode=login&pw=${pwVal}&kuerzel=${kuerzelVal}`);
                 const json = await res.json();
                 if (json.error === "Falsches Passwort") {
                     document.getElementById('loginError').innerText = "Falsches Passwort!";
                     btn.style.display = 'block'; ball.classList.remove('active');
                 } else {
                     userPw = pwVal;
+                    userKuerzel = kuerzelVal;
                     document.getElementById('loginOverlay').style.display = 'none';
                     loadPlan();
                 }
@@ -148,7 +158,7 @@
             if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
             
             try {
-                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
+                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}&kuerzel=${userKuerzel}`);
                 const json = await res.json();
                 if (json.error === "SPERRE") {
                     container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
@@ -157,6 +167,7 @@
                 }
                 container.innerHTML = ""; pendingChanges = [];
                 currentPlanData = json.data; 
+                myClasses = json.userClasses || [];
                 const data = json.data, options = json.options;
                 configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
                 const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
@@ -170,24 +181,26 @@
                         for(let i = 1; i <= 5; i++) {
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
-                            // Sprechblase mit ursprünglicher Formatierung
+                            let canEdit = myClasses.some(c => klasse.includes(c));
                             let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
+                            
                             container.innerHTML += `
-                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" 
-                                 data-row="${rowIndex}" data-col="${i}"
-                                 oncontextmenu="handleContextMenu(event, this)" ontouchstart="startTimer(this)" ontouchend="clearTimer()" style="background-color: ${isAusfall ? '' : configFarben[res] || ''}">
-                                 ${stiftHtml}
-                                 <div class="klasse">${klasse}</div>
-                                 <div class="res">${res}</div>
-                                 <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
-                                     <option value="">---</option>${options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
-                                 </select>
-                                 <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
-                                     <option value="">---</option>
-                                     <option value="ausfall">❌ Ausfall</option>
-                                     <option value="kommentar">📝 Notiz hinzufügen</option>
-                                     <option value="delete_comment" class="del-opt">🗑️ Notiz löschen</option>
-                                 </select>
+                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''}" 
+                                   data-row="${rowIndex}" data-col="${i}"
+                                   oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" style="background-color: ${isAusfall ? '' : configFarben[res] || ''}">
+                                   ${stiftHtml}
+                                   <div class="klasse">${klasse}</div>
+                                   <div class="res">${res}</div>
+                                   ${canEdit ? `
+                                   <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
+                                       <option value="">---</option>${options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                                   </select>
+                                   <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
+                                       <option value="">---</option>
+                                       <option value="ausfall">❌ Ausfall</option>
+                                       <option value="kommentar">📝 Notiz hinzufügen</option>
+                                       <option value="delete_comment" class="del-opt">🗑️ Notiz löschen</option>
+                                   </select>` : ''}
                             </div>`;
                         }
                     }
@@ -250,11 +263,8 @@
         function openExtraMenu(el) { 
             const sel = el.querySelector('.extra-select'); 
             const hatStift = el.querySelector('.stift') !== null;
-            
-            // Lösch-Option nur anzeigen, wenn Sprechblase existiert
             const delOpt = sel.querySelector('.del-opt');
             if(delOpt) delOpt.style.display = hatStift ? "block" : "none";
-
             sel.style.zIndex = "100"; 
             sel.style.pointerEvents = "all"; 
             sel.style.opacity = "1"; 
@@ -265,7 +275,15 @@
             const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
             btn.style.display = 'none'; ball.classList.add('active');
             try { 
-                const response = await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) }); 
+                const response = await fetch(url, { 
+                    method: "POST", 
+                    body: JSON.stringify({ 
+                        date: document.getElementById('datePicker').value, 
+                        changes: pendingChanges, 
+                        pw: userPw,
+                        kuerzel: userKuerzel
+                    }) 
+                }); 
                 const result = await response.json();
                 if (result.status === "success") {
                     pendingChanges = []; 
