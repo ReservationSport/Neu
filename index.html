@@ -21,19 +21,24 @@
         .box.ausfall-mode .klasse { color: #777777; }
         .box.ausfall-mode .res { color: #555555; }
 
-        /* MODERNES ICON OBEN RECHTS */
+        /* DEUTLICH GRÖSSERES ICON OBEN RECHTS */
         .stift { 
             position: absolute; 
-            top: 3px;          
+            top: 2px;          
             right: 4px;         
             z-index: 50; 
             color: #e67e22; 
             cursor: pointer; 
             pointer-events: auto; 
             display: inline-block; 
-            font-size: 22px;    /* Etwas kleiner für die Sprechblase */
+            font-size: 22px;    /* Deutlich vergrößert */
             line-height: 1;     
-            text-shadow: 0 0 3px rgba(0,0,0,0.8);
+            text-shadow: 0 0 5px rgba(0,0,0,1); /* Stärkerer Schatten für bessere Lesbarkeit */
+            transition: transform 0.2s ease;
+        }
+        .stift:hover {
+            transform: scale(1.2); /* Wird beim Drüberfahren noch ein Stück größer */
+            color: #ff9f43;
         }
 
         .zeit-box { background: #333; font-weight: bold; cursor: default; }
@@ -159,7 +164,6 @@
                         for(let i = 1; i <= 5; i++) {
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
-                            // MODERNES ICON STATT STIFT
                             let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
 
                             container.innerHTML += `
@@ -217,7 +221,6 @@
                 const text = prompt("Kommentar:"); 
                 if(text) { 
                     const s = parent.querySelector('.stift'); if (s) s.remove();
-                    // NEUES ICON AUCH HIER BEIM NEU-ANLEGEN
                     parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
                     pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + pureRes + " | KOMMENTAR:" + text }); 
                 } 
