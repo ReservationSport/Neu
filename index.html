@@ -2,253 +2,260 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reservation Sport</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* Grunddesign */
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: white; padding: 20px; margin: 0; }
-        .grid { display: grid; grid-template-columns: 120px repeat(5, 1fr); gap: 2px; max-width: 1100px; margin: auto; background: #444; border: 2px solid #444; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; }
         
-        /* Header & Navigation */
-        .date-control { text-align: center; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; }
-        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        .nav-btn { background: #333; color: white; border: 1px solid #555; padding: 10px 15px; cursor: pointer; border-radius: 4px; font-size: 18px; }
-        .nav-btn:hover { background: #444; }
-
-        /* Zellen-Design */
-        .box { background: #262626; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; cursor: pointer; transition: background 0.2s; padding: 5px; }
-        .zeit-box { background: #333; font-weight: bold; color: #aaa; cursor: default; }
-        .header-row { grid-column: span 6; background: #333; padding: 15px; font-size: 18px; font-weight: bold; display: flex; justify-content: center; align-items: center; position: relative; }
+        /* Das ursprüngliche Grid-Layout */
+        .grid { display: grid; grid-template-columns: 120px repeat(5, 1fr); gap: 2px; max-width: 1000px; margin: auto; }
         
-        /* Status-Styles */
-        .empty { opacity: 0.3; pointer-events: none; }
-        .ausfall-mode { 
-            background-color: #000 !important; 
-            background-image: linear-gradient(45deg, #333 25%, transparent 25%, transparent 50%, #333 50%, #333 75%, transparent 75%, transparent);
-            background-size: 10px 10px;
-            color: #777 !important; 
+        /* Date-Control Bereich */
+        .date-control { text-align: center; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
+        .global-loader { position: absolute; right: 0; width: 30px; height: 30px; border: 4px solid #444; border-top: 4px solid #27ae60; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .nav-group { display: flex; gap: 5px; width: 90px; }
+        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; }
+        .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        
+        /* Box-Designs */
+        .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
+        .box.empty { pointer-events: none; opacity: 0.5; }
+        
+        .box.ausfall-mode { 
+            background-color: #000000 !important; 
+            color: #777777 !important; 
+            background-image: linear-gradient(to top right, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)); 
         }
 
-        /* Texte in den Boxen */
-        .klasse { font-weight: bold; font-size: 14px; margin-bottom: 2px; }
-        .res { font-style: italic; font-size: 11px; color: rgba(255,255,255,0.9); }
-        
-        /* Kommentar-Icon */
-        .stift { position: absolute; top: 4px; right: 6px; color: #e67e22; font-size: 18px; z-index: 10; }
+        .stift { position: absolute; top: 2px; right: 4px; z-index: 50; color: #e67e22; cursor: pointer; font-size: 22px; text-shadow: 0 0 5px rgba(0,0,0,1); }
 
-        /* Speichern-Button & Loader */
-        .save-container { position: absolute; right: 20px; display: flex; align-items: center; gap: 10px; }
-        .save-btn { background: #e67e22; color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; display: none; }
-        .save-btn.success { background: #27ae60; }
-        .global-loader { width: 25px; height: 25px; border: 3px solid #444; border-top: 3px solid #27ae60; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Overlays & Dropdowns */
-        #loginOverlay { position: fixed; inset: 0; background: #1a1a1a; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #loginOverlay input { padding: 12px; margin: 15px; background: #333; border: 1px solid #444; color: white; border-radius: 8px; width: 250px; text-align: center; }
+        .zeit-box { background: #333; font-weight: bold; cursor: default; }
+        .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
+        .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
-        select { position: absolute; inset: 0; opacity: 0; cursor: pointer; z-index: 5; width: 100%; }
-        .extra-select { z-index: -1; pointer-events: none; }
+        /* LOGIN OVERLAY - Exakt wie zuvor */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #loginOverlay h2 { margin-bottom: 20px; color: #e67e22; }
+        #loginOverlay input { padding: 12px; margin: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; width: 200px; text-align: center; font-size: 16px; }
+        #loginOverlay button { padding: 12px 30px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
         
-        .divider-thin { grid-column: 1 / span 6; height: 1px; background: #444; }
-        .divider-thick { grid-column: 1 / span 6; height: 4px; background: #555; }
+        .klasse { font-weight: bold; }
+        .res { font-style: italic; font-size: 9px; margin-top: 2px; }
+        
+        /* Dropdowns */
+        select { width: 100%; height: 100%; position: absolute; top: 0; left: 0; opacity: 0; cursor: pointer; z-index: 5; }
+        .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; }
+        
+        /* Speichern Button */
+        .save-container { position: absolute; right: 10px; display: flex; align-items: center; }
+        .save-btn { padding: 8px 20px; background: #e67e22; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; display: none; }
+        .save-btn.success { background: #27ae60; } 
+        
+        /* Sport Loader Animation */
+        .sport-loader { font-size: 24px; visibility: hidden; animation: bounce 0.6s infinite alternate; margin-top: 15px; }
+        .sport-loader.active { visibility: visible; }
+        @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-10px); } }
+        
+        /* Divider */
+        .divider-thin { grid-column: 1 / span 6; height: 1px; background: #444; margin: 2px 0; }
+        .divider-thick { grid-column: 1 / span 6; height: 4px; background: #444; margin: 5px 0; }
     </style>
 </head>
 <body>
 
     <div id="loginOverlay">
-        <h1 style="color: #e67e22;">Reservation Sport</h1>
+        <h2>Reservation Sport</h2>
         <input type="password" id="pwInput" placeholder="Passwort eingeben">
-        <button class="nav-btn" style="background: #e67e22; border: none; width: 250px;" onclick="checkLogin()">Anmelden</button>
-        <p id="loginError" style="color: #e74c3c; margin-top: 15px;"></p>
+        <button id="loginBtn" onclick="checkLogin()">Anmelden</button>
+        <div id="loginBall" class="sport-loader">🏀</div>
+        <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
     </div>
 
     <div class="date-control">
-        <button class="nav-btn" onclick="changeDate(-7)">⏮</button>
-        <button class="nav-btn" onclick="changeDate(-1)">◀</button>
+        <div class="nav-group">
+            <button class="nav-btn" onclick="changeDate(-7)">⏮</button>
+            <button class="nav-btn" onclick="changeDate(-1)">◀</button>
+        </div>
         <input type="date" id="datePicker" onchange="loadPlan()">
-        <button class="nav-btn" onclick="changeDate(1)">▶</button>
-        <button class="nav-btn" onclick="changeDate(7)">⏭</button>
+        <div class="nav-group">
+            <button class="nav-btn" onclick="changeDate(1)">▶</button>
+            <button class="nav-btn" onclick="changeDate(7)">⏭</button>
+        </div>
         <div id="globalLoader" class="global-loader"></div>
     </div>
 
     <div class="grid" id="plan"></div>
 
     <script>
-        const url = "https://script.google.com/macros/s/AKfycbwpLVFHfNEIhn1So8plnEREM_ok4ST-Cd1ehG7A7QI99OuVrUGDqKsQMLOjFP-No9kSHQ/exec";
-        let userPw = "", pendingChanges = [], configFarben = {}, currentPlanData = [];
+        const url = "https://script.google.com/macros/s/AKfycbwpLVFHfNEIhn1So8plnEREM_ok4ST-Cd1ehG7A7QI99OuVrUGDqKsQMLOjFP-No9kSHQ/exec"; 
+        let pendingChanges = [], configFarben = {}, userPw = "", lastStableDate = "";
+        let currentPlanData = [], pressTimer;
 
         async function checkLogin() {
-            const pw = document.getElementById('pwInput').value;
+            const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall'), pwVal = document.getElementById('pwInput').value;
+            btn.style.display = 'none'; 
+            ball.classList.add('active');
+            
             try {
-                const res = await fetch(`${url}?mode=login&pw=${pw}`);
+                const res = await fetch(`${url}?mode=login&pw=${pwVal}`);
                 const json = await res.json();
                 if (json.error) {
-                    document.getElementById('loginError').innerText = "Passwort inkorrekt";
+                    document.getElementById('loginError').innerText = "Falsches Passwort!";
+                    btn.style.display = 'block'; 
+                    ball.classList.remove('active');
                 } else {
-                    userPw = pw;
-                    document.getElementById('loginOverlay').style.display = 'none';
+                    userPw = pwVal; 
+                    document.getElementById('loginOverlay').style.display = 'none'; 
                     loadPlan();
                 }
-            } catch(e) { alert("Verbindungsfehler"); }
+            } catch(e) { 
+                btn.style.display = 'block'; 
+                ball.classList.remove('active'); 
+                alert("Fehler bei der Anmeldung");
+            }
         }
 
         async function loadPlan() {
-            const dateVal = document.getElementById('datePicker').value;
+            const dp = document.getElementById('datePicker');
+            if (pendingChanges.length > 0 && !confirm("Nicht gespeicherte Änderungen verwerfen?")) { 
+                dp.value = lastStableDate; 
+                return; 
+            }
+            
+            const dateVal = dp.value;
+            if (!userPw || !dateVal) return;
+            lastStableDate = dateVal;
+            
             const container = document.getElementById('plan');
             const loader = document.getElementById('globalLoader');
-            
-            if (pendingChanges.length > 0 && !confirm("Änderungen wurden noch nicht gespeichert. Verwerfen?")) return;
-            
-            pendingChanges = [];
             container.innerHTML = "";
-            loader.style.display = "block";
+            loader.style.display = 'block';
 
             try {
-                const response = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
-                const json = await response.json();
+                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
+                const json = await res.json();
                 
                 if (json.sperre) {
-                    container.innerHTML = `<div class="box" style="grid-column: span 6; padding: 50px; font-size: 20px; color: #e67e22;">${json.sperre}</div>`;
+                    container.innerHTML = `<div class="box info-box">${json.sperre}</div>`;
                 } else {
                     currentPlanData = json.data;
                     const options = json.options;
-                    options.forEach(o => { if(o[0]) configFarben[o[0]] = o[1]; });
-
-                    const d = new Date(dateVal);
-                    const formattedDate = d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+                    configFarben = {}; 
+                    options.forEach(opt => { if(opt[0]) configFarben[opt[0]] = opt[1]; });
+                    
+                    const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+                    const dObj = new Date(dateVal);
+                    const tagInfo = `${wtArr[dObj.getDay()]}, ${dObj.getDate()}.${dObj.getMonth()+1}.${dObj.getFullYear()}`;
 
                     currentPlanData.forEach((row, rowIndex) => {
-                        // Header Zeile
                         if (rowIndex === 0) {
-                            container.innerHTML += `
-                                <div class="header-row">
-                                    ${formattedDate}
-                                    <div class="save-container">
-                                        <button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button>
-                                    </div>
-                                </div>`;
+                            container.innerHTML += `<div class="box header-row"><span>${tagInfo}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
                         } else {
-                            // Trennstriche einfügen (Logik wie früher)
                             if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
                             if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
-
-                            // Zeitspalte
-                            container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
-
-                            // Die 5 Slots pro Zeile
-                            for (let i = 1; i <= 5; i++) {
-                                let cellVal = String(row[i] || "");
-                                let parts = cellVal.split(' | ');
-                                let klasse = parts[0] || "";
-                                let sport = parts[1] || "";
-                                let kommentar = parts[2] || "";
+                            
+                            container.innerHTML += `<div class="box zeit-box">${row[0] || ""}</div>`;
+                            for(let i = 1; i <= 5; i++) {
+                                let val = String(row[i] || "").trim();
+                                let teile = val.split(' | '), klasse = teile[0] || "", resVal = teile[1] || "", kommentar = teile[2] || "";
+                                let isAusfall = (resVal === "Ausfall");
+                                let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
                                 
-                                let isAusfall = (sport === "Ausfall");
-                                let hatKommentar = kommentar.startsWith("KOMMENTAR:");
-
                                 container.innerHTML += `
-                                    <div class="box ${klasse === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" 
-                                         style="background-color: ${isAusfall ? '' : (configFarben[sport] || '')}"
-                                         oncontextmenu="showExtra(event, this)" 
-                                         data-row="${rowIndex}" data-col="${i}">
-                                        
-                                        ${hatKommentar ? `<i class="fas fa-comment-dots stift" onclick="alert('Notiz: ${kommentar.split(':')[1]}')"></i>` : ''}
-                                        <div class="klasse">${klasse}</div>
-                                        <div class="res">${sport}</div>
-
-                                        <select onchange="handleSelect(this, ${rowIndex}, ${i}, '${row[0]}', '${klasse}')">
-                                            <option value="">-- Sportart --</option>
-                                            ${options.map(o => `<option value="${o[0]}" ${sport === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
-                                        </select>
-
-                                        <select class="extra-select" onchange="handleExtra(this, ${rowIndex}, ${i}, '${row[0]}', '${klasse}')">
-                                            <option value="">-- Aktion --</option>
-                                            <option value="ausfall">❌ Ausfall</option>
-                                            <option value="kommentar">📝 Kommentar</option>
-                                            <option value="reset">🔄 Zurücksetzen</option>
-                                        </select>
-                                    </div>`;
+                                <div class="box ${klasse === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" 
+                                     data-row="${rowIndex}" data-col="${i}" 
+                                     oncontextmenu="handleContextMenu(event, this)" ontouchstart="startTimer(this)" ontouchend="clearTimer()"
+                                     style="background-color: ${isAusfall ? '' : configFarben[resVal] || ''}">
+                                    ${stiftHtml}
+                                    <div class="klasse">${klasse}</div>
+                                    <div class="res">${resVal}</div>
+                                    <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}')">
+                                        <option value="">---</option>
+                                        ${options.map(o => `<option value="${o[0]}" ${resVal === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                                    </select>
+                                    <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
+                                        <option value="">---</option><option value="ausfall">Ausfall</option><option value="kommentar">Kommentar</option><option value="reset">Leeren</option>
+                                    </select>
+                                </div>`;
                             }
                         }
                     });
                 }
             } catch(e) { console.error(e); }
-            loader.style.display = "none";
+            loader.style.display = 'none';
         }
 
-        function handleSelect(el, row, col, time, klasse) {
-            const sport = el.value;
-            const parent = el.parentElement;
-            parent.querySelector('.res').innerText = sport;
-            parent.style.backgroundColor = configFarben[sport] || "";
+        function addChange(el, time, slot, klasse) {
+            let res = el.value, parent = el.parentElement;
             parent.classList.remove('ausfall-mode');
+            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res;
+            parent.style.backgroundColor = configFarben[res] || "";
             
-            updatePending(time, col, `${klasse} | ${sport}`);
+            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+            let oldVal = currentPlanData[r][c] || "", cParts = oldVal.split(' | '), comment = (cParts[2] && cParts[2].includes("KOMMENTAR:")) ? cParts[2] : "";
+            
+            let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
+            if (comment) finalVal += " | " + comment;
+            
+            pendingChanges = pendingChanges.filter(ch => !(ch.time === time && ch.slotIndex === slot));
+            pendingChanges.push({ time, slotIndex: slot, val: finalVal });
+            document.getElementById('saveBtn').style.display = 'block';
         }
 
-        function handleExtra(el, row, col, time, klasse) {
-            const action = el.value;
+        function handleExtraAction(el, time, slot) {
+            const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
             if (action === "ausfall") {
-                updatePending(time, col, `${klasse} | Ausfall`);
+                parent.classList.add('ausfall-mode'); parent.querySelector('.res').innerText = "Ausfall";
+                pendingChanges.push({ time, slotIndex: slot, val: klasse + " | Ausfall" });
             } else if (action === "kommentar") {
-                const txt = prompt("Kommentar eingeben:");
-                if (txt) {
-                    const currentSport = el.parentElement.querySelector('.res').innerText;
-                    updatePending(time, col, `${klasse} | ${currentSport} | KOMMENTAR:${txt}`);
+                const text = prompt("Kommentar:");
+                if(text) {
+                    let pureRes = parent.querySelector('.res').innerText.trim();
+                    pendingChanges.push({ time, slotIndex: slot, val: klasse + (pureRes ? " | " + pureRes : " | ") + " | KOMMENTAR:" + text });
                 }
             } else if (action === "reset") {
-                updatePending(time, col, klasse);
+                parent.classList.remove('ausfall-mode'); parent.querySelector('.res').innerText = ""; parent.style.backgroundColor = "";
+                pendingChanges.push({ time, slotIndex: slot, val: klasse });
             }
-            el.value = "";
+            document.getElementById('saveBtn').style.display = 'block'; 
+            el.value = ""; 
             el.style.zIndex = "-1";
-            el.style.pointerEvents = "none";
-            el.style.opacity = "0";
-            loadPlan(); // Neu laden um UI zu aktualisieren
-        }
-
-        function updatePending(time, slot, val) {
-            // Alte Änderungen für denselben Slot entfernen
-            pendingChanges = pendingChanges.filter(c => !(c.time === time && c.slotIndex === slot));
-            pendingChanges.push({ time, slotIndex: slot, val });
-            document.getElementById('saveBtn').style.display = "block";
         }
 
         async function saveChanges() {
             const btn = document.getElementById('saveBtn');
-            btn.innerText = "Speichert...";
+            btn.innerText = "Speichern...";
             try {
-                const dateVal = document.getElementById('datePicker').value;
-                await fetch(url, {
-                    method: 'POST',
-                    body: JSON.stringify({ pw: userPw, date: dateVal, changes: pendingChanges })
-                });
-                btn.innerText = "ERFOLGREICH!";
-                btn.classList.add('success');
-                setTimeout(() => { loadPlan(); }, 1000);
-            } catch(e) { alert("Fehler beim Speichern"); btn.innerText = "FEHLER"; }
+                await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) });
+                pendingChanges = []; 
+                btn.innerText = "Gespeichert!"; 
+                btn.classList.add('success'); 
+                setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; loadPlan(); }, 1000);
+            } catch(e) { alert("Fehler beim Speichern"); btn.innerText = "SPEICHERN"; }
         }
 
         function changeDate(days) {
             const dp = document.getElementById('datePicker');
-            const d = new Date(dp.value);
+            let d = new Date(dp.value);
             d.setDate(d.getDate() + days);
             dp.valueAsDate = d;
             loadPlan();
         }
 
-        function showExtra(e, el) {
-            e.preventDefault();
-            const sel = el.querySelector('.extra-select');
-            sel.style.zIndex = "100";
-            sel.style.pointerEvents = "all";
-            sel.style.opacity = "1";
+        function startTimer(el) { pressTimer = setTimeout(() => openExtraMenu(el), 600); }
+        function clearTimer() { clearTimeout(pressTimer); }
+        function handleContextMenu(e, el) { e.preventDefault(); openExtraMenu(el); }
+        function openExtraMenu(el) { 
+            const sel = el.querySelector('.extra-select'); 
+            sel.style.zIndex = "100"; sel.style.pointerEvents = "all"; sel.style.opacity = "1"; 
         }
-
-        // Initialisierung
-        document.addEventListener('DOMContentLoaded', () => {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('datePicker').value = today;
+        
+        document.addEventListener('DOMContentLoaded', () => { 
+            const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+            document.getElementById('datePicker').value = today.toISOString().split('T')[0];
         });
     </script>
 </body>
