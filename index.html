@@ -2,236 +2,67 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reservation Sport BBZO</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root {
-            --primary-orange: #e67e22;
-            --bg-dark: #1a1a1a;
-            --bg-box: #262626;
-            --border-color: #444;
-            --text-main: #ffffff;
-        }
-
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: var(--bg-dark); 
-            color: var(--text-main); 
-            padding: 20px; 
-            margin: 0;
-        }
-
-        .grid { 
-            display: grid; 
-            grid-template-columns: 120px repeat(5, 1fr); 
-            gap: 2px; 
-            max-width: 1100px; 
-            margin: auto; 
-            background-color: #000;
-            border: 2px solid var(--border-color);
-        }
-
-        /* Navigations-Bereich */
-        .date-control { 
-            text-align: center; 
-            margin-bottom: 30px; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            gap: 20px; 
-            position: relative; 
-        }
-
-        .global-loader { 
-            position: absolute; 
-            right: 10%; 
-            width: 35px; 
-            height: 35px; 
-            border: 4px solid #333; 
-            border-top: 4px solid var(--primary-orange); 
-            border-radius: 50%; 
-            animation: spin 0.8s linear infinite; 
-            display: none; 
-        }
-
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; }
+        .grid { display: grid; grid-template-columns: 120px repeat(5, 1fr); gap: 2px; max-width: 1000px; margin: auto; }
+        .date-control { text-align: center; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
+        .global-loader { position: absolute; right: 0; width: 30px; height: 30px; border: 4px solid #444; border-top: 4px solid #27ae60; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        .nav-group { display: flex; gap: 8px; }
-
-        #datePicker { 
-            padding: 12px; 
-            background: #333; 
-            color: white; 
-            border: 1px solid var(--border-color); 
-            height: 45px; 
-            border-radius: 4px;
-            cursor: pointer; 
-            font-size: 16px;
-        }
-
-        .nav-btn { 
-            height: 45px; 
-            width: 50px; 
-            background: #333; 
-            border: 1px solid var(--border-color); 
-            color: white; 
-            cursor: pointer; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 18px; 
-            border-radius: 4px;
-            transition: background 0.2s;
-        }
-
-        .nav-btn:hover { background: #444; }
-
-        /* Box-Styling */
-        .box { 
-            border: 1px solid var(--border-color); 
-            padding: 8px; 
-            background: var(--bg-box); 
-            min-height: 60px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            text-align: center; 
-            font-size: 12px; 
-            position: relative; 
-            cursor: pointer; 
-            overflow: hidden; 
-            transition: transform 0.1s;
-        }
-
-        .box.empty { pointer-events: none; opacity: 0.4; }
+        .nav-group { display: flex; gap: 5px; width: 90px; }
+        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; }
+        .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
         
-        /* WICHTIG: Fremde Klassen bleiben voll farbig */
+        .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
+        .box.empty { pointer-events: none; opacity: 0.5; }
+        
         .box.not-mine { pointer-events: none !important; } 
-
-        /* Deine Klassen erhalten den Rahmen */
-        .box.is-mine { 
-            border: 2px solid var(--primary-orange) !important; 
-            z-index: 10; 
-            box-shadow: inset 0 0 12px rgba(230,126,34,0.3); 
-        }
-
-        .box.ausfall-mode { 
-            background-color: #000000 !important; 
-            color: #888 !important; 
-            background-image: linear-gradient(45deg, #222 25%, transparent 25%, transparent 50%, #222 50%, #222 75%, transparent 75%, transparent);
-            background-size: 10px 10px;
-        }
+        .box.is-mine { border: 2px solid #e67e22 !important; z-index: 10; box-shadow: inset 0 0 10px rgba(230,126,34,0.3); }
+        .box.ausfall-mode { background-color: #000000 !important; color: #777777 !important; background-image: linear-gradient(to top right, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)); }
         
-        .stift { 
-            position: absolute; 
-            top: 4px; 
-            right: 6px; 
-            z-index: 50; 
-            color: var(--primary-orange); 
-            font-size: 20px; 
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8); 
-        }
+        .stift { position: absolute; top: 2px; right: 4px; z-index: 50; color: #e67e22; cursor: pointer; pointer-events: auto; display: inline-block; font-size: 22px; line-height: 1; text-shadow: 0 0 5px rgba(0,0,0,1); }
 
-        .zeit-box { background: #333; font-weight: bold; cursor: default; font-size: 13px; }
+        .zeit-box { background: #333; font-weight: bold; cursor: default; }
+        .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
+        .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
-        .header-row { 
-            grid-column: span 6; 
-            background: #444; 
-            font-size: 16px; 
-            font-weight: bold; 
-            position: relative; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            height: 60px; 
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .info-box { 
-            grid-column: span 6; 
-            padding: 80px; 
-            text-align: center; 
-            color: #bbb; 
-            font-style: italic; 
-            font-size: 20px; 
-            background: #222; 
-            border: 2px dashed #444; 
-            margin: 10px 0;
-        }
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #loginOverlay input { padding: 10px; margin: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; width: 200px; }
+        #loginOverlay button { padding: 10px 20px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 220px; }
         
-        /* Login Overlay */
-        #loginOverlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: var(--bg-dark); z-index: 5000; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-        }
-
-        #loginOverlay h2 { margin-bottom: 25px; color: var(--primary-orange); font-size: 28px; }
-
-        #loginOverlay input { 
-            padding: 15px; margin: 10px; background: #333; border: 1px solid #555; 
-            color: white; border-radius: 8px; width: 250px; font-size: 16px;
-        }
-
-        #loginOverlay button { 
-            padding: 15px 30px; background: var(--primary-orange); color: white; 
-            border: none; border-radius: 8px; cursor: pointer; font-weight: bold; 
-            width: 280px; font-size: 18px; margin-top: 15px;
-            transition: background 0.3s;
-        }
-
-        #loginOverlay button:hover { background: #d35400; }
-        
-        .klasse { font-weight: 800; font-size: 13px; margin-bottom: 3px; }
-        .res { font-style: italic; font-size: 10px; color: #eee; }
-        
+        .klasse { font-weight: bold; }
+        .res { font-style: italic; font-size: 9px; margin-top: 2px; position: relative; z-index: 10; }
         select { width: 100%; height: 100%; position: absolute; top: 0; left: 0; opacity: 0; cursor: pointer; z-index: 5; }
-        
-        .save-container { position: absolute; right: 20px; z-index: 10; display: flex; align-items: center; gap: 10px; }
-        .save-btn { 
-            padding: 10px 25px; background: var(--primary-orange); color: white; 
-            border: none; border-radius: 30px; font-weight: bold; cursor: pointer; 
-            display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-        }
+        .save-container { position: absolute; right: 10px; z-index: 10; display: flex; align-items: center; height: 40px; }
+        .save-btn { padding: 8px 20px; background: #e67e22; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; display: none; }
         .save-btn.success { background: #27ae60; } 
-
-        .sport-loader { font-size: 24px; visibility: hidden; animation: bounce 0.6s infinite alternate; }
+        .sport-loader { font-size: 20px; visibility: hidden; animation: bounce 0.6s infinite alternate; }
         .sport-loader.active { visibility: visible; }
         @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-10px); } }
         
-        .divider-thin { grid-column: 1 / span 6; height: 1px; background: #555; margin: 2px 0; }
-        .divider-thick { grid-column: 1 / span 6; height: 6px; background: #666; margin: 6px 0; }
+        .divider-thin { grid-column: 1 / span 6; height: 1px; background: #444; margin: 2px 0; }
+        .divider-thick { grid-column: 1 / span 6; height: 4px; background: #444; margin: 5px 0; }
         .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="loginOverlay">
-        <h2>RESERVATION SPORT</h2>
-        <input type="text" id="kuerzelInput" placeholder="Kürzel (z.B. bilu)" spellcheck="false">
+        <h2>Reservation Sport</h2>
+        <input type="text" id="kuerzelInput" placeholder="Kürzel (z.B. bilu)">
         <input type="password" id="pwInput" placeholder="Passwort (bbzo)">
-        <button id="loginBtn" onclick="checkLogin()">ANMELDEN</button>
-        <div id="loginBall" class="sport-loader" style="margin-top: 20px;">🏀</div>
-        <p id="loginError" style="color: #e74c3c; margin-top: 15px; font-weight: bold;"></p>
+        <button id="loginBtn" onclick="checkLogin()">Anmelden</button>
+        <div id="loginBall" class="sport-loader" style="margin-top: 10px;">🏀</div>
+        <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
     </div>
 
     <div class="date-control">
-        <div class="nav-group">
-            <button id="btnPrevWeek" class="nav-btn" title="Eine Woche zurück" onclick="changeDate(-7)">⏮</button>
-            <button id="btnPrevDay" class="nav-btn" title="Einen Tag zurück" onclick="changeDate(-1)">◀</button>
-        </div>
+        <div class="nav-group"><button id="btnPrevWeek" class="nav-btn" onclick="changeDate(-7)">⏮</button><button id="btnPrevDay" class="nav-btn" onclick="changeDate(-1)">◀</button></div>
         <input type="date" id="datePicker" onchange="loadPlan()">
-        <div class="nav-group">
-            <button id="btnNextDay" class="nav-btn" title="Einen Tag vor" onclick="changeDate(1)">▶</button>
-            <button id="btnNextWeek" class="nav-btn" title="Eine Woche vor" onclick="changeDate(7)">⏭</button>
-        </div>
+        <div class="nav-group"><button id="btnNextDay" class="nav-btn" onclick="changeDate(1)">▶</button><button id="btnNextWeek" class="nav-btn" onclick="changeDate(7)">⏭</button></div>
         <div id="globalLoader" class="global-loader"></div>
     </div>
-
-    <div class="grid" id="plan">
-        </div>
+    <div class="grid" id="plan"></div>
 
     <script>
         const url = "https://script.google.com/macros/s/AKfycbyWSRyj-aulrV8dipp-MQZm8fptruo4m3rWzEnvP0me4a7rvhOHAxcLS0sBnKm-ePEBxA/exec"; 
@@ -244,7 +75,6 @@
             const currentDate = new Date(dp.value); currentDate.setHours(12,0,0,0);
             const heute = new Date(); heute.setHours(12,0,0,0);
             const maxDate = new Date(heute); maxDate.setDate(heute.getDate() + 28);
-
             document.getElementById('btnPrevDay').style.visibility = (currentDate <= heute) ? 'hidden' : 'visible';
             document.getElementById('btnPrevWeek').style.visibility = (new Date(currentDate).setDate(currentDate.getDate()-7) < heute) ? 'hidden' : 'visible';
             document.getElementById('btnNextDay').style.visibility = (currentDate >= maxDate) ? 'hidden' : 'visible';
@@ -255,18 +85,14 @@
             const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
             const pwVal = document.getElementById('pwInput').value;
             const kuerzelVal = document.getElementById('kuerzelInput').value.trim().toLowerCase();
-            
-            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Bitte Kürzel eingeben!"; return; }
-            
+            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel fehlt!"; return; }
             btn.style.display = 'none'; ball.classList.add('active');
             const initialDate = document.getElementById('datePicker').value;
-
             try {
                 const res = await fetch(`${url}?pw=${pwVal}&date=${initialDate}&kuerzel=${kuerzelVal}`);
                 const json = await res.json();
-                
                 if (json.error === "Falsches Passwort") {
-                    document.getElementById('loginError').innerText = "Passwort nicht korrekt!";
+                    document.getElementById('loginError').innerText = "Falsches Passwort!";
                     btn.style.display = 'block'; ball.classList.remove('active');
                 } else {
                     userPw = pwVal; userKuerzel = kuerzelVal;
@@ -274,145 +100,75 @@
                     renderPlan(json);
                     updateNavButtons();
                 }
-            } catch(e) { 
-                document.getElementById('loginError').innerText = "Verbindungsfehler!"; 
-                btn.style.display = 'block'; ball.classList.remove('active'); 
-            }
+            } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
         }
 
         async function loadPlan() {
             const dp = document.getElementById('datePicker');
             const dateObj = new Date(dp.value);
             const container = document.getElementById('plan');
-
-            // Wochenend-Logik
             if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
-                container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende... 😴<br><small style="font-size: 14px; color: #888;">(Am Samstag und Sonntag finden keine regulären Lektionen statt)</small></div>`;
-                updateNavButtons();
-                return;
+                container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende... 😴</div>`;
+                updateNavButtons(); return;
             }
-
-            if (pendingChanges.length > 0 && !confirm("Nicht gespeicherte Änderungen gehen verloren. Fortfahren?")) { 
-                dp.value = lastStableDate; return; 
-            }
-            
+            if (pendingChanges.length > 0 && !confirm("Änderungen verwerfen?")) { dp.value = lastStableDate; return; }
             lastStableDate = dp.value; 
             updateNavButtons();
             document.getElementById('globalLoader').style.display = 'block';
-            
             try {
                 const res = await fetch(`${url}?date=${dp.value}&pw=${userPw}&kuerzel=${userKuerzel}`);
                 const json = await res.json();
                 renderPlan(json);
-            } catch(e) { console.error("Ladefehler:", e); }
+            } catch(e) { console.error(e); }
             document.getElementById('globalLoader').style.display = 'none';
         }
 
         function renderPlan(json) {
             const container = document.getElementById('plan');
-            if (json.error === "SPERRE") { 
-                container.innerHTML = `<div class="box info-box">${json.msg}</div>`; 
-                return; 
-            }
-            
-            container.innerHTML = ""; 
-            pendingChanges = [];
-            currentPlanData = json.data; 
-            myClasses = json.userClasses || [];
-            configFarben = {}; 
-            json.options.forEach(opt => configFarben[opt[0]] = opt[1]);
-            
+            if (json.error === "SPERRE") { container.innerHTML = `<div class="box info-box">${json.msg}</div>`; return; }
+            container.innerHTML = ""; pendingChanges = [];
+            currentPlanData = json.data; myClasses = json.userClasses || [];
+            configFarben = {}; json.options.forEach(opt => configFarben[opt[0]] = opt[1]);
             const dateVal = document.getElementById('datePicker').value;
             const dateObj = new Date(dateVal);
             const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 
             json.data.forEach((row, rowIndex) => {
                 if (rowIndex === 0) {
-                    container.innerHTML += `
-                    <div class="box header-row">
-                        <span>${wtArr[dateObj.getDay()]}, ${dateObj.getDate()}.${dateObj.getMonth()+1}.${dateObj.getFullYear()}</span>
-                        <div class="save-container">
-                            <div id="sport-loader" class="sport-loader">🏀</div>
-                            <button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button>
-                        </div>
-                    </div>`;
+                    container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${dateObj.getDate()}.${dateObj.getMonth()+1}.${dateObj.getFullYear()}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
                 } else {
                     if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
                     if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
-                    
                     container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
-                    
                     for(let i = 1; i <= 5; i++) {
-                        let val = row[i] || "", teile = val.split(' | '), 
-                            klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
-                        
-                        let isAusfall = (res === "Ausfall"), 
-                            canEdit = myClasses.some(c => klasse.includes(c));
-                        
-                        let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? 
-                            `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
-                        
+                        let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
+                        let isAusfall = (res === "Ausfall"), canEdit = myClasses.some(c => klasse.includes(c));
+                        let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
                         container.innerHTML += `
                         <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''}" 
-                             data-row="${rowIndex}" data-col="${i}" 
-                             oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" 
+                             data-row="${rowIndex}" data-col="${i}" oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" 
                              ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" 
                              style="background-color: ${isAusfall ? '' : (configFarben[res] || '')}">
-                             ${stiftHtml}
-                             <div class="klasse">${klasse}</div>
-                             <div class="res">${res}</div>
-                             ${canEdit ? `
-                             <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
-                                 <option value="">---</option>
-                                 ${json.options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
-                             </select>
-                             <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
-                                 <option value="">---</option>
-                                 <option value="ausfall">❌ Ausfall markieren</option>
-                                 <option value="kommentar">📝 Notiz hinzufügen</option>
-                                 <option value="delete_comment">🗑️ Notiz/Ausfall löschen</option>
-                             </select>` : ''}
+                             ${stiftHtml}<div class="klasse">${klasse}</div><div class="res">${res}</div>
+                             ${canEdit ? `<select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();"><option value="">---</option>${json.options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}</select>
+                             <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})"><option value="">---</option><option value="ausfall">❌ Ausfall</option><option value="kommentar">📝 Notiz</option><option value="delete_comment">🗑️ Löschen</option></select>` : ''}
                         </div>`;
                     }
                 }
             });
         }
 
-        // Steuerung und Event-Handling
-        window.changeDate = (days) => { 
-            const dp = document.getElementById('datePicker'); 
-            let d = new Date(dp.value); 
-            d.setDate(d.getDate() + days); 
-            dp.valueAsDate = d; 
-            loadPlan(); 
-        };
-
-        window.closeAllExtraMenus = () => {
-            document.querySelectorAll('.extra-select').forEach(sel => { 
-                sel.style.zIndex = "-1"; sel.style.opacity = "0"; sel.style.pointerEvents = "none"; 
-            });
-        };
-
+        window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
+        window.closeAllExtraMenus = () => document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.opacity = "0"; sel.style.pointerEvents = "none"; });
         window.handleContextMenu = (e, el) => { e.preventDefault(); closeAllExtraMenus(); openExtraMenu(el); };
-        window.startTimer = (el) => { pressTimer = setTimeout(() => openExtraMenu(el), 600); };
+        window.startTimer = (el) => { pressTimer = setTimeout(() => openExtraMenu(el), 500); };
         window.clearTimer = () => clearTimeout(pressTimer);
-        
-        function openExtraMenu(el) { 
-            const sel = el.querySelector('.extra-select'); 
-            sel.style.zIndex = "100"; sel.style.opacity = "1"; sel.style.pointerEvents = "all";
-            setTimeout(() => { if(sel.showPicker) sel.showPicker(); else sel.click(); }, 50);
-        }
+        function openExtraMenu(el) { const sel = el.querySelector('.extra-select'); sel.style.zIndex = "100"; sel.style.opacity = "1"; sel.style.pointerEvents = "all"; setTimeout(() => { if(sel.showPicker) sel.showPicker(); else sel.click(); }, 50); }
 
         window.addChange = (el, time, slot, klasse) => {
-            let res = el.value; const parent = el.parentElement;
-            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
-            parent.classList.remove('ausfall-mode');
-            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res;
-            parent.style.backgroundColor = configFarben[res] || "";
-            
-            let t = (currentPlanData[r][c] || "").split(' | ');
-            let comm = (t[2] && t[2].startsWith("KOMMENTAR:")) ? t[2] : "";
-            
+            let res = el.value; const parent = el.parentElement; const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+            parent.classList.remove('ausfall-mode'); parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; parent.style.backgroundColor = configFarben[res] || "";
+            let t = (currentPlanData[r][c] || "").split(' | '); let comm = (t[2] && t[2].startsWith("KOMMENTAR:")) ? t[2] : "";
             pendingChanges.push({ time, slotIndex: slot, val: klasse + (res ? " | " + res : "") + (comm ? " | " + comm : "") });
             document.getElementById('saveBtn').style.display = 'block';
         };
@@ -421,15 +177,12 @@
             const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
             let pureRes = parent.querySelector('.res').innerText.trim();
-            let t = (currentPlanData[r][c] || "").split(' | ');
-            let comm = (t[2] && t[2].startsWith("KOMMENTAR:")) ? t[2] : "";
-
+            let t = (currentPlanData[r][c] || "").split(' | '); let comm = (t[2] && t[2].startsWith("KOMMENTAR:")) ? t[2] : "";
             if (action === "ausfall") {
-                parent.classList.add('ausfall-mode'); 
-                parent.querySelector('.res').innerText = "Ausfall";
+                parent.classList.add('ausfall-mode'); parent.querySelector('.res').innerText = "Ausfall";
                 pendingChanges.push({ time, slotIndex: slot, val: klasse + " | Ausfall" + (comm ? " | " + comm : "") });
             } else if (action === "kommentar") {
-                const text = prompt("Deine Notiz für diesen Slot:");
+                const text = prompt("Notiz:");
                 if(text) {
                     const s = parent.querySelector('.stift'); if (s) s.remove();
                     parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
@@ -437,9 +190,7 @@
                 }
             } else if (action === "delete_comment") {
                 const s = parent.querySelector('.stift'); if (s) s.remove();
-                parent.classList.remove('ausfall-mode');
-                parent.querySelector('.res').innerText = (pureRes === "Ausfall") ? "" : pureRes;
-                pendingChanges.push({ time, slotIndex: slot, val: klasse + (pureRes !== "Ausfall" && pureRes !== "" ? " | " + pureRes : "") });
+                pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "Ausfall" ? "Ausfall" : pureRes) });
             }
             document.getElementById('saveBtn').style.display = 'block'; closeAllExtraMenus(); el.value = "";
         };
@@ -447,42 +198,21 @@
         window.saveChanges = async () => {
             const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader');
             btn.style.display = 'none'; ball.classList.add('active');
-            
             try {
-                const res = await fetch(url, { 
-                    method: "POST", 
-                    body: JSON.stringify({ 
-                        date: document.getElementById('datePicker').value, 
-                        kuerzel: userKuerzel, 
-                        changes: pendingChanges, 
-                        pw: userPw 
-                    }) 
-                });
+                const res = await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, kuerzel: userKuerzel, changes: pendingChanges, pw: userPw }) });
                 const json = await res.json();
-                
                 if (json.status === "success") {
-                    pendingChanges = []; 
-                    ball.classList.remove('active');
-                    btn.innerText = "GESPEICHERT! ✅"; btn.classList.add('success'); btn.style.display = 'block';
-                    setTimeout(() => { 
-                        btn.style.display = 'none'; 
-                        btn.classList.remove('success'); 
-                        btn.innerText = "SPEICHERN"; 
-                    }, 2000);
+                    pendingChanges = []; ball.classList.remove('active');
+                    btn.innerText = "Check! ✅"; btn.classList.add('success'); btn.style.display = 'block';
+                    setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; }, 1500);
                 } else { throw new Error(); }
-            } catch (e) { 
-                ball.classList.remove('active'); 
-                btn.style.display = 'block'; 
-                btn.innerText = "FEHLER!"; 
-                alert("Speichern fehlgeschlagen.");
-            }
+            } catch (e) { ball.classList.remove('active'); btn.style.display = 'block'; btn.innerText = "Fehler!"; }
         };
 
         document.addEventListener('DOMContentLoaded', () => { 
             const t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
-            const dateStr = t.toISOString().split('T')[0];
-            document.getElementById('datePicker').value = dateStr;
-            lastStableDate = dateStr;
+            document.getElementById('datePicker').value = t.toISOString().split('T')[0];
+            lastStableDate = document.getElementById('datePicker').value;
         });
     </script>
 </body>
