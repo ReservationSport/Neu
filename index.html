@@ -69,9 +69,15 @@
     </div>
 
     <div class="date-control">
-        <div class="nav-group"><button class="nav-btn" onclick="changeDate(-7)">⏮</button><button class="nav-btn" onclick="changeDate(-1)">◀</button></div>
+        <div class="nav-group">
+            <button id="btnPrevWeek" class="nav-btn" onclick="changeDate(-7)">⏮</button>
+            <button id="btnPrevDay" class="nav-btn" onclick="changeDate(-1)">◀</button>
+        </div>
         <input type="date" id="datePicker" onchange="loadPlan()">
-        <div class="nav-group"><button class="nav-btn" onclick="changeDate(1)">▶</button><button class="nav-btn" onclick="changeDate(7)">⏭</button></div>
+        <div class="nav-group">
+            <button class="nav-btn" onclick="changeDate(1)">▶</button>
+            <button class="nav-btn" onclick="changeDate(7)">⏭</button>
+        </div>
         <div id="globalLoader" class="global-loader"></div>
     </div>
     <div class="grid" id="plan"></div>
@@ -82,11 +88,19 @@
         let currentPlanData = []; 
 
         window.addEventListener('beforeunload', (e) => {
-            if (pendingChanges.length > 0) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
+            if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
         });
+
+        // HIER WIRD DIE NAV-BUTTON LOGIK AKTUALISIERT
+        function updateNavButtons() {
+            const dp = document.getElementById('datePicker');
+            const currentDate = new Date(dp.value); currentDate.setHours(12, 0, 0, 0);
+            const heute = new Date(); heute.setHours(12, 0, 0, 0);
+            const yesterday = new Date(currentDate); yesterday.setDate(yesterday.getDate() - 1);
+            const lastWeek = new Date(currentDate); lastWeek.setDate(lastWeek.getDate() - 7);
+            document.getElementById('btnPrevDay').style.visibility = (yesterday < heute) ? 'hidden' : 'visible';
+            document.getElementById('btnPrevWeek').style.visibility = (lastWeek < heute) ? 'hidden' : 'visible';
+        }
 
         function closeAllExtraMenus() { document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.pointerEvents = "none"; sel.style.opacity = "0"; sel.blur(); }); }
 
@@ -114,6 +128,8 @@
             }
             const dateVal = document.getElementById('datePicker').value;
             if (!userPw || !dateVal) return;
+            
+            updateNavButtons();
             document.getElementById('globalLoader').style.display = 'block';
             
             const container = document.getElementById('plan');
@@ -121,7 +137,6 @@
             const heute = new Date(); heute.setHours(12,0,0,0);
             const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
             
-            // PRÜFUNG DER ZEITRÄUME MIT DEINEN ORIGINAL-SÄTZEN
             if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
             if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
             if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
@@ -169,7 +184,7 @@
         }
 
         function getExistingComment(r, c) {
-            let val = currentPlanData[r][c] || "";
+            let val = (currentPlanData[r] && currentPlanData[r][c]) ? currentPlanData[r][c] : "";
             let teile = val.split(' | ');
             return (teile[2] && teile[2].startsWith("KOMMENTAR:")) ? teile[2] : "";
         }
@@ -181,11 +196,9 @@
             parent.classList.remove('ausfall-mode');
             parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
             parent.style.backgroundColor = configFarben[res] || ""; 
-            
             let comment = getExistingComment(r, c);
             let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
             if (comment) finalVal += " | " + comment;
-
             pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
             document.getElementById('saveBtn').style.display = 'block';
         };
@@ -194,7 +207,6 @@
             const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
             let pureRes = parent.querySelector('.res').innerText.trim();
-            
             if (action === "ausfall") { 
                 parent.classList.add('ausfall-mode'); parent.style.backgroundColor = "";
                 parent.querySelector('.res').innerText = "Ausfall"; 
