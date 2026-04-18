@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Reservation Sport</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; }
         .grid { display: grid; grid-template-columns: 120px repeat(5, 1fr); gap: 2px; max-width: 1000px; margin: auto; }
@@ -20,19 +21,22 @@
         .box.ausfall-mode .klasse { color: #777777; }
         .box.ausfall-mode .res { color: #555555; }
 
+        /* Die ursprüngliche Sprechblasen-Formatierung */
         .stift { 
             position: absolute; 
             top: 2px;          
-            right: 2px;         
+            right: 4px;         
             z-index: 50; 
+            color: #e67e22; 
             cursor: pointer; 
             pointer-events: auto; 
             display: inline-block; 
-            font-size: 16px;    
+            font-size: 22px;    
             line-height: 1;     
+            text-shadow: 0 0 5px rgba(0,0,0,1); 
             transition: transform 0.2s ease;
         }
-        .stift:hover { transform: scale(1.3); }
+        .stift:hover { transform: scale(1.2); color: #ff9f43; }
 
         .zeit-box { background: #333; font-weight: bold; cursor: default; }
         .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
@@ -166,7 +170,8 @@
                         for(let i = 1; i <= 5; i++) {
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
-                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')">📝</span>` : "";
+                            // Sprechblase mit ursprünglicher Formatierung
+                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
                             container.innerHTML += `
                             <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${isAusfall ? 'ausfall-mode' : ''}" 
                                  data-row="${rowIndex}" data-col="${i}"
@@ -181,7 +186,7 @@
                                      <option value="">---</option>
                                      <option value="ausfall">❌ Ausfall</option>
                                      <option value="kommentar">📝 Notiz hinzufügen</option>
-                                     <option value="delete_comment" class="del-opt" style="display:none;">🗑️ Notiz löschen</option>
+                                     <option value="delete_comment" class="del-opt">🗑️ Notiz löschen</option>
                                  </select>
                             </div>`;
                         }
@@ -225,7 +230,7 @@
                 const text = prompt("Notiz eingeben:"); 
                 if(text) { 
                     const s = parent.querySelector('.stift'); if (s) s.remove();
-                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')">📝</span>`;
+                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
                     pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "" ? "" : pureRes) + " | KOMMENTAR:" + text }); 
                 } 
             } else if (action === "delete_comment") {
@@ -246,8 +251,8 @@
             const sel = el.querySelector('.extra-select'); 
             const hatStift = el.querySelector('.stift') !== null;
             
-            // Zeige oder verstecke die Lösch-Option dynamisch
-            const delOpt = sel.querySelector('.delete_comment') || sel.querySelector('option[value="delete_comment"]');
+            // Lösch-Option nur anzeigen, wenn Sprechblase existiert
+            const delOpt = sel.querySelector('.del-opt');
             if(delOpt) delOpt.style.display = hatStift ? "block" : "none";
 
             sel.style.zIndex = "100"; 
