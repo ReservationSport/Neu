@@ -84,7 +84,7 @@
     <div class="grid" id="plan"></div>
 
     <script>
-        const url = "https://script.google.com/macros/s/AKfycbyhu-wwwLc7b_ZrkVKj8QdLZWK17_ih2czN5ojd3yUXwPrjIRzsYUvxcnzln7I2I57c6Q/exec"; 
+        const url = "HIER_DEINE_SCRIPT_URL_EINTRAGEN"; 
         let pendingChanges = [], configFarben = {}, userPw = "", pressTimer;
         let currentPlanData = []; 
         let lastStableDate = ""; 
@@ -150,9 +150,9 @@
                 const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}`);
                 const json = await res.json();
 
-                // SPERRZEITEN-HANDLING
+                // SPERRZEITEN-HANDLING (Exakt gleicher Style wie Wochenende)
                 if (json.error === "SPERRE") {
-                    container.innerHTML = `<div class="box info-box">Heute keine Reservation:<br><strong>${json.msg}</strong></div>`;
+                    container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
                     document.getElementById('globalLoader').style.display = 'none';
                     return;
                 }
