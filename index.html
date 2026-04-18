@@ -17,8 +17,9 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
         .nav-group { display: flex; gap: 5px; width: 90px; }
-        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; }
-        .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; border-radius: 4px; }
+        .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; border-radius: 4px; }
+        .nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
         
         /* Box-Designs */
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
@@ -36,7 +37,7 @@
         .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
         .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
-        /* LOGIN OVERLAY - Exakt wie zuvor */
+        /* LOGIN OVERLAY */
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         #loginOverlay h2 { margin-bottom: 20px; color: #e67e22; }
         #loginOverlay input { padding: 12px; margin: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; width: 200px; text-align: center; font-size: 16px; }
@@ -47,7 +48,7 @@
         
         /* Dropdowns */
         select { width: 100%; height: 100%; position: absolute; top: 0; left: 0; opacity: 0; cursor: pointer; z-index: 5; }
-        .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; }
+        .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; transition: opacity 0.3s; }
         
         /* Speichern Button */
         .save-container { position: absolute; right: 10px; display: flex; align-items: center; }
@@ -76,13 +77,13 @@
 
     <div class="date-control">
         <div class="nav-group">
-            <button class="nav-btn" onclick="changeDate(-7)">⏮</button>
-            <button class="nav-btn" onclick="changeDate(-1)">◀</button>
+            <button id="btnPrevWeek" class="nav-btn" onclick="changeDate(-7)">⏮</button>
+            <button id="btnPrevDay" class="nav-btn" onclick="changeDate(-1)">◀</button>
         </div>
         <input type="date" id="datePicker" onchange="loadPlan()">
         <div class="nav-group">
-            <button class="nav-btn" onclick="changeDate(1)">▶</button>
-            <button class="nav-btn" onclick="changeDate(7)">⏭</button>
+            <button id="btnNextDay" class="nav-btn" onclick="changeDate(1)">▶</button>
+            <button id="btnNextWeek" class="nav-btn" onclick="changeDate(7)">⏭</button>
         </div>
         <div id="globalLoader" class="global-loader"></div>
     </div>
@@ -90,7 +91,7 @@
     <div class="grid" id="plan"></div>
 
     <script>
-        const url = "https://script.google.com/macros/s/AKfycbwGXT6SG1imjuSISK7LKyyVHwyks_mBGTpV5pn1e_ydDR3osR6s5AmEiCNd8c39zl2MGg/exec"; 
+        const url = "https://script.google.com/macros/s/AKfycbwpLVFHfNEIhn1So8plnEREM_ok4ST-Cd1ehG7A7QI99OuVrUGDqKsQMLOjFP-No9kSHQ/exec"; 
         let pendingChanges = [], configFarben = {}, userPw = "", lastStableDate = "";
         let currentPlanData = [], pressTimer;
 
@@ -112,9 +113,7 @@
                     loadPlan();
                 }
             } catch(e) { 
-                btn.style.display = 'block'; 
-                ball.classList.remove('active'); 
-                alert("Fehler bei der Anmeldung");
+                btn.style.display = 'block'; ball.classList.remove('active'); alert("Login fehlgeschlagen.");
             }
         }
 
@@ -128,6 +127,9 @@
             const dateVal = dp.value;
             if (!userPw || !dateVal) return;
             lastStableDate = dateVal;
+            
+            // Navigationseinschränkungen prüfen (Vergangenheit / Zukunft)
+            updateNavButtons(dateVal);
             
             const container = document.getElementById('plan');
             const loader = document.getElementById('globalLoader');
@@ -152,7 +154,14 @@
 
                     currentPlanData.forEach((row, rowIndex) => {
                         if (rowIndex === 0) {
-                            container.innerHTML += `<div class="box header-row"><span>${tagInfo}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+                            container.innerHTML += `
+                                <div class="box header-row">
+                                    <span>${tagInfo}</span>
+                                    <div class="save-container">
+                                        <div id="sport-loader" class="sport-loader" style="margin-top:0; margin-right:10px;">🏀</div>
+                                        <button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button>
+                                    </div>
+                                </div>`;
                         } else {
                             if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
                             if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
@@ -177,7 +186,10 @@
                                         ${options.map(o => `<option value="${o[0]}" ${resVal === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
                                     </select>
                                     <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
-                                        <option value="">---</option><option value="ausfall">Ausfall</option><option value="kommentar">Kommentar</option><option value="reset">Leeren</option>
+                                        <option value="">---</option>
+                                        <option value="ausfall">❌ Ausfall</option>
+                                        <option value="kommentar">📝 Kommentar</option>
+                                        <option value="reset">🔄 Leeren</option>
                                     </select>
                                 </div>`;
                             }
@@ -186,6 +198,19 @@
                 }
             } catch(e) { console.error(e); }
             loader.style.display = 'none';
+        }
+
+        function updateNavButtons(dateVal) {
+            const current = new Date(dateVal);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            // Verhindern, dass man weiter als 1 Jahr zurück geht (Beispiel)
+            const minDate = new Date();
+            minDate.setFullYear(today.getFullYear() - 1);
+            
+            document.getElementById('btnPrevDay').disabled = current <= minDate;
+            document.getElementById('btnPrevWeek').disabled = current <= minDate;
         }
 
         function addChange(el, time, slot, klasse) {
@@ -208,33 +233,53 @@
         function handleExtraAction(el, time, slot) {
             const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
             if (action === "ausfall") {
-                parent.classList.add('ausfall-mode'); parent.querySelector('.res').innerText = "Ausfall";
+                parent.classList.add('ausfall-mode'); 
+                parent.querySelector('.res').innerText = "Ausfall";
                 pendingChanges.push({ time, slotIndex: slot, val: klasse + " | Ausfall" });
             } else if (action === "kommentar") {
-                const text = prompt("Kommentar:");
+                const text = prompt("Kommentar für " + klasse + ":");
                 if(text) {
                     let pureRes = parent.querySelector('.res').innerText.trim();
                     pendingChanges.push({ time, slotIndex: slot, val: klasse + (pureRes ? " | " + pureRes : " | ") + " | KOMMENTAR:" + text });
                 }
             } else if (action === "reset") {
-                parent.classList.remove('ausfall-mode'); parent.querySelector('.res').innerText = ""; parent.style.backgroundColor = "";
+                parent.classList.remove('ausfall-mode'); 
+                parent.querySelector('.res').innerText = ""; 
+                parent.style.backgroundColor = "";
                 pendingChanges.push({ time, slotIndex: slot, val: klasse });
             }
             document.getElementById('saveBtn').style.display = 'block'; 
             el.value = ""; 
             el.style.zIndex = "-1";
+            el.style.opacity = "0";
+            el.style.pointerEvents = "none";
         }
 
         async function saveChanges() {
             const btn = document.getElementById('saveBtn');
-            btn.innerText = "Speichern...";
+            const ball = document.getElementById('sport-loader');
+            btn.style.display = 'none';
+            ball.classList.add('active');
+            
             try {
                 await fetch(url, { method: "POST", body: JSON.stringify({ date: document.getElementById('datePicker').value, changes: pendingChanges, pw: userPw }) });
                 pendingChanges = []; 
                 btn.innerText = "Gespeichert!"; 
                 btn.classList.add('success'); 
-                setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; loadPlan(); }, 1000);
-            } catch(e) { alert("Fehler beim Speichern"); btn.innerText = "SPEICHERN"; }
+                btn.style.display = 'block'; 
+                ball.classList.remove('active');
+                setTimeout(() => { 
+                    btn.style.display = 'none'; 
+                    btn.classList.remove('success'); 
+                    btn.innerText = "SPEICHERN"; 
+                    loadPlan(); 
+                }, 1000);
+            } catch(e) { 
+                alert("Fehler beim Speichern"); 
+                btn.style.display = 'block'; 
+                btn.innerText = "SPEICHERN";
+                ball.classList.remove('active');
+            }
         }
 
         function changeDate(days) {
@@ -245,16 +290,21 @@
             loadPlan();
         }
 
+        // Timer für "Langes Drücken" auf Mobile
         function startTimer(el) { pressTimer = setTimeout(() => openExtraMenu(el), 600); }
         function clearTimer() { clearTimeout(pressTimer); }
         function handleContextMenu(e, el) { e.preventDefault(); openExtraMenu(el); }
+        
         function openExtraMenu(el) { 
             const sel = el.querySelector('.extra-select'); 
-            sel.style.zIndex = "100"; sel.style.pointerEvents = "all"; sel.style.opacity = "1"; 
+            sel.style.zIndex = "100"; 
+            sel.style.pointerEvents = "all"; 
+            sel.style.opacity = "1"; 
         }
         
         document.addEventListener('DOMContentLoaded', () => { 
-            const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+            const today = new Date(); 
+            today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
             document.getElementById('datePicker').value = today.toISOString().split('T')[0];
         });
     </script>
