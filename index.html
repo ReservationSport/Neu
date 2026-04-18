@@ -17,7 +17,7 @@
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
         .box.empty { pointer-events: none; opacity: 0.5; }
         
-        /* Berechtigungs-Styles */
+        /* Berechtigungs-Feedback */
         .box.not-mine { pointer-events: none !important; opacity: 0.3; filter: grayscale(1); }
         .box.is-mine { border: 1px solid #e67e22; }
 
@@ -79,12 +79,22 @@
         let currentPlanData = []; 
         let lastStableDate = ""; 
 
-        // LOGIN PRÜFUNG
+        // NAVIGATION BUTTONS SICHTBARKEIT
+        function updateNavButtons() {
+            const dp = document.getElementById('datePicker');
+            const currentDate = new Date(dp.value); currentDate.setHours(12, 0, 0, 0);
+            const heute = new Date(); heute.setHours(12, 0, 0, 0);
+            const yesterday = new Date(currentDate); yesterday.setDate(yesterday.getDate() - 1);
+            const lastWeek = new Date(currentDate); lastWeek.setDate(lastWeek.getDate() - 7);
+            document.getElementById('btnPrevDay').style.visibility = (yesterday < heute) ? 'hidden' : 'visible';
+            document.getElementById('btnPrevWeek').style.visibility = (lastWeek < heute) ? 'hidden' : 'visible';
+        }
+
         async function checkLogin() {
             const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
             const pwVal = document.getElementById('pwInput').value;
             const kuerzelVal = document.getElementById('kuerzelInput').value.trim().toLowerCase();
-            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel eingeben!"; return; }
+            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel fehlt!"; return; }
             btn.style.display = 'none'; ball.classList.add('active');
             try {
                 const res = await fetch(`${url}?pw=${pwVal}&date=${document.getElementById('datePicker').value}&kuerzel=${kuerzelVal}`);
@@ -100,15 +110,24 @@
             } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
         }
 
-        // PLAN LADEN
         async function loadPlan() {
             const dp = document.getElementById('datePicker');
             if (pendingChanges.length > 0 && !confirm("Ungespeicherte Änderungen gehen verloren. Fortfahren?")) {
                 dp.value = lastStableDate; return;
             }
             const dateVal = dp.value; if (!userPw || !dateVal) return;
-            lastStableDate = dateVal; updateNavButtons();
+            
+            // SICHERHEITSPRÜFUNGEN (DEIN ORIGINAL)
+            const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
+            const heute = new Date(); heute.setHours(12,0,0,0);
+            const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
             const container = document.getElementById('plan');
+            
+            if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; return; }
+            if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; return; }
+            if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; return; }
+
+            lastStableDate = dateVal; updateNavButtons();
             document.getElementById('globalLoader').style.display = 'block';
             try {
                 const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}&kuerzel=${userKuerzel}`);
@@ -118,7 +137,6 @@
             document.getElementById('globalLoader').style.display = 'none';
         }
 
-        // PLAN ZEICHNEN
         function renderPlan(json) {
             const container = document.getElementById('plan');
             if (json.error === "SPERRE") {
@@ -162,7 +180,6 @@
             });
         }
 
-        // ÄNDERUNGEN SPEICHERN
         window.saveChanges = async () => {
             const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader');
             btn.style.display = 'none'; ball.classList.add('active');
@@ -174,10 +191,9 @@
                     btn.innerText = "Check! ✅"; btn.classList.add('success'); btn.style.display = 'block';
                     setTimeout(() => { btn.style.display = 'none'; btn.classList.remove('success'); btn.innerText = "SPEICHERN"; }, 1500);
                 } else { throw new Error(); }
-            } catch (e) { ball.classList.remove('active'); btn.style.display = 'block'; btn.innerText = "Fehler!"; alert("Fehler beim Speichern."); }
+            } catch (e) { ball.classList.remove('active'); btn.style.display = 'block'; btn.innerText = "Fehler!"; alert("Speichern fehlgeschlagen."); }
         };
 
-        // EVENT HANDLER (AUSFALL / NOTIZ / MENU)
         window.handleExtraAction = (el, time, slot) => {
             const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
@@ -213,10 +229,8 @@
             document.getElementById('saveBtn').style.display = 'block';
         };
 
-        // NAVIGATION & TOOLS
         window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
-        window.updateNavButtons = () => { /* Original Nav Logik */ };
-        window.closeAllExtraMenus = () => document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.opacity = "0"; });
+        window.closeAllExtraMenus = () => document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.opacity = "0"; sel.style.pointerEvents = "none"; });
         window.handleContextMenu = (e, el) => { e.preventDefault(); closeAllExtraMenus(); openExtraMenu(el); };
         window.startTimer = (el) => { pressTimer = setTimeout(() => openExtraMenu(el), 500); };
         window.clearTimer = () => clearTimeout(pressTimer);
@@ -225,12 +239,15 @@
             setTimeout(() => { if(sel.showPicker) sel.showPicker(); else sel.click(); }, 50);
         }
         function getExistingComment(r, c) {
+            if(!currentPlanData[r]) return "";
             let val = currentPlanData[r][c] || ""; let t = val.split(' | ');
             return (t[2] && t[2].startsWith("KOMMENTAR:")) ? t[2] : "";
         }
         document.addEventListener('DOMContentLoaded', () => { 
             const t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
-            document.getElementById('datePicker').value = t.toISOString().split('T')[0];
+            const dateStr = t.toISOString().split('T')[0];
+            document.getElementById('datePicker').value = dateStr;
+            lastStableDate = dateStr;
         });
     </script>
 </body>
