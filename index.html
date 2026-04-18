@@ -181,7 +181,9 @@
                                      <option value="">---</option>${options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
                                  </select>
                                  <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
-                                     <option value="">---</option><option value="ausfall">Ausfall</option><option value="kommentar">Kommentar</option>
+                                     <option value="">---</option>
+                                     <option value="ausfall">❌ Ausfall</option>
+                                     <option value="kommentar">📝 Kommentar</option>
                                  </select>
                             </div>`;
                         }
@@ -225,7 +227,7 @@
                 if(text) { 
                     const s = parent.querySelector('.stift'); if (s) s.remove();
                     parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
-                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + pureRes + " | KOMMENTAR:" + text }); 
+                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "Ausfall" ? "Ausfall" : pureRes) + " | KOMMENTAR:" + text }); 
                 } 
             }
             document.getElementById('saveBtn').style.display = 'block'; closeAllExtraMenus(); el.value = "";
