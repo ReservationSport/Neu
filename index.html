@@ -91,6 +91,7 @@
             <button id="btnPrevWeek" class="nav-btn" onclick="changeDate(-7)">⏮</button>
             <button id="btnPrevDay" class="nav-btn" onclick="changeDate(-1)">◀</button>
         </div>
+        <button id="btnToday" class="nav-btn" onclick="goToToday()" title="Heute"><i class="fas fa-house"></i></button>
         <input type="date" id="datePicker" onchange="loadPlan()">
         <div class="nav-group" style="display: flex; align-items: center;">
             <button class="nav-btn" onclick="changeDate(1)">▶</button>
@@ -331,6 +332,17 @@
         };
 
         window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
+        
+        window.goToToday = () => {
+            const dp = document.getElementById('datePicker');
+            const today = new Date();
+            const offset = today.getTimezoneOffset();
+            today.setMinutes(today.getMinutes() - offset);
+            const dateStr = today.toISOString().split('T')[0];
+            dp.value = dateStr;
+            loadPlan();
+        };
+
         document.addEventListener('DOMContentLoaded', () => { 
             const today = new Date(); const offset = today.getTimezoneOffset(); today.setMinutes(today.getMinutes() - offset); 
             const dateStr = today.toISOString().split('T')[0];
