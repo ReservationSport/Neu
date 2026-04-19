@@ -67,8 +67,8 @@
 <body>
     <div id="loginOverlay">
         <h2>Reservation Sport</h2>
-        <input type="text" id="kuerzelInput" placeholder="Kürzel (z.B. bilu)" oninput="document.getElementById('loginError').innerText=''">
-        <input type="password" id="pwInput" placeholder="Passwort (bbzo)" oninput="document.getElementById('loginError').innerText=''">
+        <input type="text" id="kuerzelInput" placeholder="Kürzel" oninput="document.getElementById('loginError').innerText=''">
+        <input type="password" id="pwInput" placeholder="Passwort" oninput="document.getElementById('loginError').innerText=''">
         <button id="loginBtn" onclick="checkLogin()">Anmelden</button>
         <div id="loginBall" class="sport-loader" style="margin-top: 10px;">🏀</div>
         <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
@@ -182,7 +182,6 @@
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
                             
-                            // GEÄNDERT: Jetzt exakter Vergleich statt .includes()
                             let canEdit = myClasses.some(c => klasse.trim() === c.trim());
                             
                             let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
