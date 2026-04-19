@@ -8,15 +8,18 @@
         body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; }
         .grid { display: grid; grid-template-columns: 120px repeat(5, 1fr); gap: 2px; max-width: 1000px; margin: auto; }
         .date-control { text-align: center; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
-        .global-loader { position: absolute; right: 0; width: 30px; height: 30px; border: 4px solid #444; border-top: 4px solid #27ae60; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
+        
+        .global-loader { position: absolute; left: 20px; width: 30px; height: 30px; border: 4px solid #444; border-top: 4px solid #27ae60; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .nav-group { display: flex; gap: 5px; width: 90px; }
-        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; }
-        .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        
+        .nav-group { display: flex; gap: 5px; }
+        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; border-radius: 4px; }
+        .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; border-radius: 4px; }
+        .nav-btn:hover { background: #444; }
         
         /* Refresh Button Styling */
-        .refresh-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #e67e22; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; }
-        .refresh-btn:hover { background: #444; color: #ff9f43; }
+        .refresh-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #e67e22; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; border-radius: 4px; margin-left: 10px; }
+        .refresh-btn:hover { background: #444; color: #ff9f43; transform: rotate(30deg); }
 
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
         .box.empty { pointer-events: none; opacity: 0.5; }
@@ -81,30 +84,27 @@
     </div>
 
     <div class="date-control">
+        <div id="globalLoader" class="global-loader"></div>
         <div class="nav-group">
             <button id="btnPrevWeek" class="nav-btn" onclick="changeDate(-7)">⏮</button>
             <button id="btnPrevDay" class="nav-btn" onclick="changeDate(-1)">◀</button>
         </div>
         <input type="date" id="datePicker" onchange="loadPlan()">
-        
-        <button class="refresh-btn" onclick="loadPlan()" title="Tag aktualisieren">
-            <i class="fas fa-sync-alt"></i>
-        </button>
-
-        <div class="nav-group">
+        <div class="nav-group" style="display: flex; align-items: center;">
             <button class="nav-btn" onclick="changeDate(1)">▶</button>
             <button class="nav-btn" onclick="changeDate(7)">⏭</button>
+            
+            <button class="refresh-btn" onclick="loadPlan()" title="Tag aktualisieren">
+                <i class="fas fa-sync-alt"></i>
+            </button>
         </div>
-        <div id="globalLoader" class="global-loader"></div>
     </div>
     <div class="grid" id="plan"></div>
 
     <script>
         const url = "https://script.google.com/macros/s/AKfycbxxtCiUNj_pm_uzMbGnVLvL0OswvsvPA4sM3n3RLRhaD8Vfq8_8vCQ30onpvrM4KhKB/exec"; 
         let pendingChanges = [], configFarben = {}, userPw = "", userKuerzel = "", pressTimer;
-        let currentPlanData = []; 
-        let lastStableDate = ""; 
-        let myClasses = [];
+        let currentPlanData = [], lastStableDate = "", myClasses = [];
 
         window.addEventListener('beforeunload', (e) => {
             if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
@@ -120,7 +120,14 @@
             document.getElementById('btnPrevWeek').style.visibility = (lastWeek < heute) ? 'hidden' : 'visible';
         }
 
-        function closeAllExtraMenus() { document.querySelectorAll('.extra-select').forEach(sel => { sel.style.zIndex = "-1"; sel.style.pointerEvents = "none"; sel.style.opacity = "0"; sel.blur(); }); }
+        function closeAllExtraMenus() {
+            document.querySelectorAll('.extra-select').forEach(sel => {
+                sel.style.zIndex = "-1";
+                sel.style.pointerEvents = "none";
+                sel.style.opacity = "0";
+                sel.blur();
+            });
+        }
 
         async function checkLogin() {
             const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
@@ -183,9 +190,11 @@
                 configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
                 const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
                 const [y, m, d] = dateVal.split('-').map(Number);
+                
                 data.forEach((row, rowIndex) => {
-                    if (rowIndex === 0) container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
-                    else {
+                    if (rowIndex === 0) {
+                        container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+                    } else {
                         if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
                         if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
                         container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
@@ -306,13 +315,13 @@
                         btn.style.display = 'none'; 
                         btn.classList.remove('success'); 
                         btn.innerText = "SPEICHERN"; 
-                    }, 1500); 
+                        loadPlan();
+                    }, 1000); 
                 } else { throw new Error(); }
             } catch (e) { 
                 ball.classList.remove('active'); 
                 btn.style.display = 'block'; 
                 btn.innerText = "Fehler!"; 
-                alert("Speichern fehlgeschlagen. Seite wird neu geladen...");
                 loadPlan();
             }
         };
