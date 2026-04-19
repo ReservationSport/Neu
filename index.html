@@ -14,10 +14,13 @@
         #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; }
         .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
         
+        /* Refresh Button Styling */
+        .refresh-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #e67e22; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; }
+        .refresh-btn:hover { background: #444; color: #ff9f43; }
+
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
         .box.empty { pointer-events: none; opacity: 0.5; }
         
-        /* Editierbarkeit & Rahmen */
         .box.not-mine { pointer-events: none !important; } 
         .box.is-mine { border: 2px solid #e67e22 !important; z-index: 10; box-shadow: inset 0 0 10px rgba(230,126,34,0.3); }
 
@@ -45,34 +48,11 @@
         .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
         .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
         
-        /* Login Overlay Styling angepasst an Vorlage */
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         #loginOverlay h2 { color: #e67e22; font-size: 2.2em; margin-bottom: 30px; font-weight: bold; }
-        #loginOverlay input { 
-            padding: 15px; 
-            margin: 8px; 
-            background: #333; 
-            border: 1px solid #444; 
-            color: white; 
-            border-radius: 8px; 
-            width: 280px; 
-            font-size: 16px; 
-            outline: none;
-        }
+        #loginOverlay input { padding: 15px; margin: 8px; background: #333; border: 1px solid #444; color: white; border-radius: 8px; width: 280px; font-size: 16px; outline: none; }
         #loginOverlay input:focus { border-color: #e67e22; }
-        #loginOverlay button { 
-            padding: 15px; 
-            margin-top: 15px;
-            background: #e67e22; 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            width: 310px; 
-            font-size: 18px;
-            transition: background 0.2s;
-        }
+        #loginOverlay button { padding: 15px; margin-top: 15px; background: #e67e22; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 310px; font-size: 18px; transition: background 0.2s; }
         #loginOverlay button:hover { background: #d35400; }
         
         .klasse { font-weight: bold; }
@@ -106,6 +86,11 @@
             <button id="btnPrevDay" class="nav-btn" onclick="changeDate(-1)">◀</button>
         </div>
         <input type="date" id="datePicker" onchange="loadPlan()">
+        
+        <button class="refresh-btn" onclick="loadPlan()" title="Tag aktualisieren">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+
         <div class="nav-group">
             <button class="nav-btn" onclick="changeDate(1)">▶</button>
             <button class="nav-btn" onclick="changeDate(7)">⏭</button>
@@ -163,7 +148,7 @@
         async function loadPlan() {
             const dp = document.getElementById('datePicker');
             if (pendingChanges.length > 0) {
-                if (!confirm("Du hast ungespeicherte Änderungen. Trotzdem fortfahren?")) {
+                if (!confirm("Du hast ungespeicherte Änderungen. Diese gehen beim Aktualisieren verloren! Trotzdem fortfahren?")) {
                     dp.value = lastStableDate; 
                     return;
                 }
@@ -173,7 +158,7 @@
             lastStableDate = dateVal; 
             updateNavButtons();
             const container = document.getElementById('plan');
-            container.innerHTML = ""; 
+            
             document.getElementById('globalLoader').style.display = 'block';
             const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
             const heute = new Date(); heute.setHours(12,0,0,0);
@@ -207,9 +192,7 @@
                         for(let i = 1; i <= 5; i++) {
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
-                            
                             let canEdit = myClasses.some(c => klasse.trim() === c.trim());
-                            
                             let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
                             
                             container.innerHTML += `
