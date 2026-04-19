@@ -199,17 +199,18 @@
                     if (rowIndex === 0) {
                         container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
                     } else {
-                        // NEU: Vorab prüfen, ob in dieser Zeile schon eine Halle belegt ist
-                        let rowReservedBy = null;
+                        // --- FILTER-LOGIK START ---
+                        let belegteHallenInZeile = [];
                         for (let j = 1; j <= 5; j++) {
-                            let valScan = row[j] || "";
-                            let teileScan = valScan.split(' | ');
-                            let resScan = teileScan[1] || "";
-                            if (resScan && resScan !== "Ausfall") {
-                                rowReservedBy = teileScan[0]; // Das Kürzel des Besitzers merken
-                                break;
+                            let cellVal = String(row[j] || "").trim();
+                            if (cellVal !== "") {
+                                let resPart = cellVal.split(' | ')[1] || cellVal.split(' | ')[0];
+                                if (resPart !== "Ausfall" && options.some(o => o[0] === resPart)) {
+                                    belegteHallenInZeile.push(resPart);
+                                }
                             }
                         }
+                        // --- FILTER-LOGIK ENDE ---
 
                         if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
                         if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
@@ -218,10 +219,6 @@
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
                             let canEdit = myClasses.some(c => klasse.trim() === c.trim());
-                            
-                            // Logik: Gesperrt, wenn jemand anderes reserviert hat UND man nicht selbst der Besitzer der Reservierung ist
-                            let isBlockedByOther = (rowReservedBy && !canEdit); 
-
                             let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
                             
                             container.innerHTML += `
@@ -232,8 +229,9 @@
                                    <div class="klasse">${klasse}</div>
                                    <div class="res">${res}</div>
                                    ${canEdit ? `
-                                   <select ${isBlockedByOther ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
-                                       <option value="">---</option>${options.map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                                   <select onchange="addChange(this, '${row[0]}', ${i}, '${klasse}'); closeAllExtraMenus();">
+                                       <option value="">---</option>
+                                       ${options.filter(o => !belegteHallenInZeile.includes(o[0]) || res === o[0]).map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
                                    </select>
                                    <select class="extra-select" onchange="handleExtraAction(this, '${row[0]}', ${i})">
                                        <option value="">---</option>
@@ -265,6 +263,7 @@
             let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
             if (comment) finalVal += " | " + comment;
             
+            // Lokale Daten aktualisieren
             if (!currentPlanData[r]) currentPlanData[r] = [];
             currentPlanData[r][c] = finalVal;
             
