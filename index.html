@@ -19,7 +19,10 @@
         
         /* Refresh Button Styling */
         .refresh-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #e67e22; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; border-radius: 4px; margin-left: 10px; }
-        .refresh-btn:hover { background: #444; color: #ff9f43; transform: rotate(30deg); }
+        .refresh-btn:hover { background: #444; color: #ff9f43; }
+        /* Fix für hängende Rotation auf Handys: Animation nur beim Klick */
+        .refresh-btn:active i { animation: spin-once 0.5s ease-in-out; }
+        @keyframes spin-once { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
         .box.empty { pointer-events: none; opacity: 0.5; }
@@ -93,7 +96,6 @@
         <div class="nav-group" style="display: flex; align-items: center;">
             <button class="nav-btn" onclick="changeDate(1)">▶</button>
             <button class="nav-btn" onclick="changeDate(7)">⏭</button>
-            
             <button class="refresh-btn" onclick="loadPlan()" title="Tag aktualisieren">
                 <i class="fas fa-sync-alt"></i>
             </button>
