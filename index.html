@@ -168,7 +168,6 @@
             updateNavButtons();
             const container = document.getElementById('plan');
             
-            // Logik zum Ausblenden beim Wechseln des Tages:
             container.innerHTML = ""; 
             
             document.getElementById('globalLoader').style.display = 'block';
@@ -249,6 +248,11 @@
             let comment = getExistingComment(r, c);
             let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
             if (comment) finalVal += " | " + comment;
+            
+            // Lokale Daten aktualisieren
+            if (!currentPlanData[r]) currentPlanData[r] = [];
+            currentPlanData[r][c] = finalVal;
+            
             pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
             document.getElementById('saveBtn').style.display = 'block';
         };
@@ -258,27 +262,35 @@
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
             let pureRes = parent.querySelector('.res').innerText.trim();
             
+            let finalVal = "";
             if (action === "ausfall") { 
                 parent.classList.add('ausfall-mode'); parent.style.backgroundColor = "";
                 parent.querySelector('.res').innerText = "Ausfall"; 
                 let comment = getExistingComment(r, c);
-                let finalVal = klasse + " | Ausfall" + (comment ? " | " + comment : "");
-                pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
+                finalVal = klasse + " | Ausfall" + (comment ? " | " + comment : "");
             } else if (action === "kommentar") { 
                 const text = prompt("Notiz eingeben:"); 
                 if(text) { 
                     const s = parent.querySelector('.stift'); if (s) s.remove();
                     parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
-                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "" ? "" : pureRes) + " | KOMMENTAR:" + text }); 
+                    finalVal = klasse + " | " + (pureRes === "" || pureRes === "Ausfall" ? pureRes : pureRes) + " | KOMMENTAR:" + text;
                 } 
             } else if (action === "delete_comment") {
                 const s = parent.querySelector('.stift'); 
                 if (s) {
                     s.remove();
-                    pendingChanges.push({ time, slotIndex: slot, val: klasse + " | " + (pureRes === "" ? "" : pureRes) });
+                    finalVal = klasse + " | " + (pureRes === "" ? "" : pureRes);
                 }
             }
-            document.getElementById('saveBtn').style.display = 'block'; closeAllExtraMenus(); el.value = "";
+
+            if (finalVal) {
+                if (!currentPlanData[r]) currentPlanData[r] = [];
+                currentPlanData[r][c] = finalVal;
+                pendingChanges.push({ time, slotIndex: slot, val: finalVal });
+                document.getElementById('saveBtn').style.display = 'block';
+            }
+            
+            closeAllExtraMenus(); el.value = "";
         };
 
         window.startTimer = (el) => { pressTimer = setTimeout(() => { closeAllExtraMenus(); openExtraMenu(el); }, 500); };
@@ -320,14 +332,13 @@
                         btn.style.display = 'none'; 
                         btn.classList.remove('success'); 
                         btn.innerText = "SPEICHERN"; 
-                        loadPlan();
+                        // Kein loadPlan() mehr hier, um Flackern zu vermeiden
                     }, 1000); 
                 } else { throw new Error(); }
             } catch (e) { 
                 ball.classList.remove('active'); 
                 btn.style.display = 'block'; 
                 btn.innerText = "Fehler!"; 
-                loadPlan();
             }
         };
 
