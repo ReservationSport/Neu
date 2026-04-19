@@ -20,7 +20,6 @@
         /* Refresh Button Styling */
         .refresh-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #e67e22; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; border-radius: 4px; margin-left: 10px; }
         .refresh-btn:hover { background: #444; color: #ff9f43; }
-        /* Fix für hängende Rotation auf Handys: Animation nur beim Klick */
         .refresh-btn:active i { animation: spin-once 0.5s ease-in-out; }
         @keyframes spin-once { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -167,6 +166,9 @@
             lastStableDate = dateVal; 
             updateNavButtons();
             const container = document.getElementById('plan');
+            
+            // Logik zum Ausblenden beim Wechseln des Tages:
+            container.innerHTML = ""; 
             
             document.getElementById('globalLoader').style.display = 'block';
             const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
