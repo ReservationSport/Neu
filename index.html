@@ -272,6 +272,7 @@
             const parent = el.parentElement;
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
             
+            // Sofortige visuelle Bereinigung
             parent.classList.remove('ausfall-mode', 'outdoor-mode');
             
             if (res === "" || res === "---") {
@@ -291,7 +292,12 @@
             
             pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
             document.getElementById('saveBtn').style.display = 'block';
-            el.blur(); 
+
+            // PC & HANDY FIX: Fokus verlieren erzwingen
+            setTimeout(() => { 
+                el.blur(); 
+                window.focus(); 
+            }, 50);
         };
 
         window.handleExtraAction = (el, time, slot) => {
