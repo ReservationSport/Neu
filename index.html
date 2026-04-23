@@ -189,9 +189,7 @@
         } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
     }
 
-    // --- NEU & ERGÄNZT: Nachricht im Sheet als gelesen markieren ---
     async function selectNotification(msgId, dateStr) {
-        // 1. Markierung an das Backend senden
         try {
             await fetch(url, {
                 method: "POST",
@@ -203,13 +201,9 @@
                 })
             });
         } catch (e) { console.error("Fehler beim Markieren:", e); }
-
-        // 2. Zum Datum springen und laden
         document.getElementById('datePicker').value = dateStr;
         closeDashboard();
         loadPlan(); 
-        
-        // Der Badge wird im loadPlan() durch checkNotifications() automatisch aktualisiert
     }
 
     async function checkNotifications() {
@@ -228,7 +222,6 @@
                     const item = document.createElement('div');
                     item.className = 'notif-item';
                     item.innerHTML = `<strong>${n.date} - ${n.time}</strong><br>${n.msg}`;
-                    // Hier die neue Funktion aufrufen
                     item.onclick = (e) => {
                         e.stopPropagation();
                         selectNotification(n.id, n.date);
