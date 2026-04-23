@@ -20,6 +20,17 @@
         .refresh-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #e67e22; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; border-radius: 4px; margin-left: 10px; }
         .refresh-btn:hover { background: #444; color: #ff9f43; }
         .refresh-btn:active i { animation: spin-once 0.5s ease-in-out; }
+
+        /* Dashboard Glocke */
+        .bell-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; border-radius: 4px; position: relative; }
+        .bell-btn .badge { position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; background: #e74c3c; border-radius: 50%; display: none; border: 1px solid #1a1a1a; }
+        .bell-btn.active { color: #f1c40f; animation: swing 2s infinite ease-in-out; }
+        @keyframes swing { 0%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(15deg); } 20%, 40% { transform: rotate(-15deg); } 50% { transform: rotate(0); } }
+
+        #dashboard { position: fixed; top: 80px; right: 20px; width: 300px; background: #2c3e50; border: 1px solid #444; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: none; z-index: 3000; padding: 15px; }
+        #dashboard h3 { margin-top: 0; font-size: 16px; color: #e67e22; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .notif-item { font-size: 12px; padding: 10px 0; border-bottom: 1px solid #34495e; color: #ecf0f1; }
+
         @keyframes spin-once { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
@@ -35,6 +46,10 @@
 
         .box.outdoor-mode { background-color: #27ae60 !important; color: white !important; }
         .box.outdoor-mode .res { font-weight: bold; }
+
+        /* U21 Modus - Blau */
+        .box.u21-mode { background-color: #2980b9 !important; color: white !important; }
+        .box.u21-mode .res { font-weight: bold; }
 
         .stift { position: absolute; top: 2px; right: 4px; z-index: 50; color: #e67e22; cursor: pointer; pointer-events: auto; display: inline-block; font-size: 22px; line-height: 1; text-shadow: 0 0 5px rgba(0,0,0,1); transition: transform 0.2s ease; }
         .stift:hover { transform: scale(1.2); color: #ff9f43; }
@@ -80,7 +95,7 @@
         .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; }
     </style>
 </head>
-<body onclick="closeAllExtraMenus()">
+<body onclick="closeAllExtraMenus(); closeDashboard();">
     <div id="loginOverlay">
         <h2>Reservation Sport</h2>
         <input type="text" id="kuerzelInput" placeholder="Kürzel" oninput="document.getElementById('loginError').innerText=''">
@@ -88,6 +103,11 @@
         <button id="loginBtn" onclick="checkLogin()">Anmelden</button>
         <div id="loginBall" class="sport-loader" style="margin-top: 10px;">🏀</div>
         <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
+    </div>
+
+    <div id="dashboard">
+        <h3>Meldungen</h3>
+        <div id="notifList">Keine neuen Meldungen.</div>
     </div>
 
     <div class="date-control">
@@ -101,6 +121,10 @@
         <div class="nav-group" style="display: flex; align-items: center;">
             <button class="nav-btn" onclick="changeDate(1)">▶</button>
             <button class="nav-btn" onclick="changeDate(7)">⏭</button>
+            <button id="bellBtn" class="bell-btn" onclick="event.stopPropagation(); toggleDashboard()" title="Benachrichtigungen">
+                <i class="fas fa-bell"></i>
+                <div id="bellBadge" class="badge"></div>
+            </button>
             <button class="refresh-btn" onclick="loadPlan()" title="Tag aktualisieren">
                 <i class="fas fa-sync-alt"></i>
             </button>
@@ -133,6 +157,17 @@
                 sel.style.pointerEvents = "none";
                 sel.style.opacity = "0";
             });
+        }
+
+        function toggleDashboard() {
+            const db = document.getElementById('dashboard');
+            db.style.display = (db.style.display === 'block') ? 'none' : 'block';
+            document.getElementById('bellBadge').style.display = 'none';
+            document.getElementById('bellBtn').classList.remove('active');
+        }
+
+        function closeDashboard() {
+            document.getElementById('dashboard').style.display = 'none';
         }
 
         async function checkLogin() {
@@ -191,7 +226,35 @@
                 currentPlanData = json.data; 
                 myClasses = json.userClasses || [];
                 allClassTeachers = json.allClassTeachers || {};
-                const data = json.data, options = json.options;
+                const data = json.data, options = json.options, notifications = json.notifications || [];
+                
+                // Dashboard verarbeiten
+                const notifList = document.getElementById('notifList');
+                const bellBadge = document.getElementById('bellBadge');
+                const bellBtn = document.getElementById('bellBtn');
+                notifList.innerHTML = "";
+                let hasMyNotifs = false;
+
+                if (notifications.length > 0) {
+                    notifications.forEach(n => {
+                        const item = document.createElement('div');
+                        item.className = 'notif-item';
+                        item.innerHTML = `<strong>${n.time}:</strong> ${n.msg}`;
+                        if (n.kuerzel === userKuerzel) {
+                            item.style.color = "#e67e22";
+                            item.innerHTML = "⚠️ " + item.innerHTML;
+                            hasMyNotifs = true;
+                        }
+                        notifList.appendChild(item);
+                    });
+                    if (hasMyNotifs) {
+                        bellBadge.style.display = 'block';
+                        bellBtn.classList.add('active');
+                    }
+                } else {
+                    notifList.innerHTML = "Keine neuen Meldungen.";
+                }
+
                 configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
                 const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
                 const [y, m, d] = dateVal.split('-').map(Number);
@@ -205,14 +268,13 @@
                         container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
                         
                         for(let i = 1; i <= 5; i++) {
-                            // BELEGUNG PRÜFEN (für diesen spezifischen Slot i)
                             let belegteHallenInZeileOhneMich = [];
                             for (let k = 1; k <= 5; k++) {
-                                if (k === i) continue; // Den eigenen Slot ignorieren!
+                                if (k === i) continue; 
                                 let otherVal = String(row[k] || "").trim();
                                 if (otherVal !== "") {
                                     let resPart = otherVal.split(' | ')[1] || "";
-                                    if (resPart && resPart !== "Ausfall" && resPart !== "Outdoor") {
+                                    if (resPart && resPart !== "Ausfall" && resPart !== "Outdoor" && resPart !== "U21") {
                                         belegteHallenInZeileOhneMich.push(resPart);
                                     }
                                 }
@@ -221,14 +283,15 @@
                             let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
                             let isAusfall = (res === "Ausfall");
                             let isOutdoor = (res === "Outdoor");
+                            let isU21 = (res === "U21");
                             let canEdit = myClasses.some(c => klasse.trim() === c.trim());
                             let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
                             let teacher = klasse.split('/').map(k => allClassTeachers[k.trim()] || "").filter(t => t !== "").join(" / ");
 
                             container.innerHTML += `
-                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''} ${isOutdoor ? 'outdoor-mode' : ''}" 
+                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''} ${isOutdoor ? 'outdoor-mode' : ''} ${isU21 ? 'u21-mode' : ''}" 
                                    data-row="${rowIndex}" data-col="${i}"
-                                   oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" style="background-color: ${ (isAusfall || isOutdoor) ? '' : configFarben[res] || ''}">
+                                   oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" style="background-color: ${ (isAusfall || isOutdoor || isU21) ? '' : configFarben[res] || ''}">
                                    ${stiftHtml}
                                    <div class="klasse">${klasse}</div>
                                    <div class="lehrer-info">${teacher}</div>
@@ -238,9 +301,7 @@
                                        <option value="">---</option>
                                        ${options.filter(o => {
                                            const optName = o[0];
-                                           // Wenn es die aktuell gewählte Option ist, immer anzeigen
                                            if (res === optName) return true;
-                                           // Prüfen ob Teile dieser Option bereits von KOLLEGEN belegt sind
                                            let istGesperrt = belegteHallenInZeileOhneMich.some(belegt => {
                                                let belegtParts = belegt.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
                                                let optParts = optName.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
@@ -273,7 +334,7 @@
         window.addChange = (el, time, slot, klasse) => { 
             let res = el.value; const parent = el.parentElement;
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
-            parent.classList.remove('ausfall-mode', 'outdoor-mode');
+            parent.classList.remove('ausfall-mode', 'outdoor-mode', 'u21-mode');
             parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
             parent.style.backgroundColor = configFarben[res] || ""; 
             let comment = getExistingComment(r, c);
@@ -291,14 +352,14 @@
             let pureRes = parent.querySelector('.res').innerText.trim();
             let finalVal = "";
             if (action === "outdoor") {
-                parent.classList.remove('ausfall-mode');
+                parent.classList.remove('ausfall-mode', 'u21-mode');
                 parent.classList.add('outdoor-mode');
                 parent.style.backgroundColor = "";
                 parent.querySelector('.res').innerText = "Outdoor";
                 let comment = getExistingComment(r, c);
                 finalVal = klasse + " | Outdoor" + (comment ? " | " + comment : "");
             } else if (action === "ausfall") { 
-                parent.classList.remove('outdoor-mode');
+                parent.classList.remove('outdoor-mode', 'u21-mode');
                 parent.classList.add('ausfall-mode'); 
                 parent.style.backgroundColor = "";
                 parent.querySelector('.res').innerText = "Ausfall"; 
@@ -309,7 +370,7 @@
                 if(text) { 
                     const s = parent.querySelector('.stift'); if (s) s.remove();
                     parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
-                    finalVal = klasse + " | " + (pureRes === "" || pureRes === "Outdoor" || pureRes === "Ausfall" ? pureRes : pureRes) + " | KOMMENTAR:" + text;
+                    finalVal = klasse + " | " + (pureRes === "" || pureRes === "Outdoor" || pureRes === "Ausfall" || pureRes === "U21" ? pureRes : pureRes) + " | KOMMENTAR:" + text;
                 } 
             } else if (action === "delete_comment") {
                 const s = parent.querySelector('.stift'); 
