@@ -132,332 +132,352 @@
     </div>
     <div class="grid" id="plan"></div>
 
-    <script>
-        const url = "https://script.google.com/macros/s/AKfycbynst5mMRtftD614vNswGy4VG4or2n4m9cnF4Om8UU4uYOO3IdnRgclGu1EqMefxbwz/exec"; 
-        let pendingChanges = [], configFarben = {}, userPw = "", userKuerzel = "", pressTimer;
-        let currentPlanData = [], lastStableDate = "", myClasses = [], allClassTeachers = {};
+<script>
+    const url = "https://script.google.com/macros/s/AKfycbynst5mMRtftD614vNswGy4VG4or2n4m9cnF4Om8UU4uYOO3IdnRgclGu1EqMefxbwz/exec"; 
+    let pendingChanges = [], configFarben = {}, userPw = "", userKuerzel = "", pressTimer;
+    let currentPlanData = [], lastStableDate = "", myClasses = [], allClassTeachers = {};
 
-        window.addEventListener('beforeunload', (e) => {
-            if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
+    window.addEventListener('beforeunload', (e) => {
+        if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    function updateNavButtons() {
+        const dp = document.getElementById('datePicker');
+        const currentDate = new Date(dp.value); currentDate.setHours(12, 0, 0, 0);
+        const heute = new Date(); heute.setHours(12, 0, 0, 0);
+        const yesterday = new Date(currentDate); yesterday.setDate(yesterday.getDate() - 1);
+        const lastWeek = new Date(currentDate); lastWeek.setDate(lastWeek.getDate() - 7);
+        document.getElementById('btnPrevDay').style.visibility = (yesterday < heute) ? 'hidden' : 'visible';
+        document.getElementById('btnPrevWeek').style.visibility = (lastWeek < heute) ? 'hidden' : 'visible';
+    }
+
+    function closeAllExtraMenus() {
+        document.querySelectorAll('.extra-select').forEach(sel => {
+            sel.style.zIndex = "-1";
+            sel.style.pointerEvents = "none";
+            sel.style.opacity = "0";
         });
+    }
 
-        function updateNavButtons() {
-            const dp = document.getElementById('datePicker');
-            const currentDate = new Date(dp.value); currentDate.setHours(12, 0, 0, 0);
-            const heute = new Date(); heute.setHours(12, 0, 0, 0);
-            const yesterday = new Date(currentDate); yesterday.setDate(yesterday.getDate() - 1);
-            const lastWeek = new Date(currentDate); lastWeek.setDate(lastWeek.getDate() - 7);
-            document.getElementById('btnPrevDay').style.visibility = (yesterday < heute) ? 'hidden' : 'visible';
-            document.getElementById('btnPrevWeek').style.visibility = (lastWeek < heute) ? 'hidden' : 'visible';
-        }
+    function toggleDashboard() {
+        const db = document.getElementById('dashboard');
+        db.style.display = (db.style.display === 'block') ? 'none' : 'block';
+    }
 
-        function closeAllExtraMenus() {
-            document.querySelectorAll('.extra-select').forEach(sel => {
-                sel.style.zIndex = "-1";
-                sel.style.pointerEvents = "none";
-                sel.style.opacity = "0";
-            });
-        }
+    function closeDashboard() {
+        document.getElementById('dashboard').style.display = 'none';
+    }
 
-        function toggleDashboard() {
-            const db = document.getElementById('dashboard');
-            db.style.display = (db.style.display === 'block') ? 'none' : 'block';
-            // Nur beim Öffnen Badge entfernen, wenn man möchte. Hier lassen wir es für die Übersicht
-        }
-
-        function closeDashboard() {
-            document.getElementById('dashboard').style.display = 'none';
-        }
-
-        async function checkLogin() {
-            const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
-            const pwVal = document.getElementById('pwInput').value;
-            const kuerzelVal = document.getElementById('kuerzelInput').value.trim().toLowerCase();
-            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel fehlt!"; return; }
-            btn.style.display = 'none'; ball.classList.add('active');
-            try {
-                const res = await fetch(`${url}?mode=login&pw=${pwVal}&kuerzel=${kuerzelVal}`);
-                const json = await res.json();
-                if (json.error === "Falsches Passwort") {
-                    document.getElementById('loginError').innerText = "Falsches Passwort!";
-                    btn.style.display = 'block'; ball.classList.remove('active');
-                } else {
-                    userPw = pwVal;
-                    userKuerzel = kuerzelVal;
-                    document.getElementById('loginOverlay').style.display = 'none';
-                    loadPlan();
-                }
-            } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
-        }
-
-        async function checkNotifications() {
-            try {
-                const res = await fetch(`${url}?mode=checkNotifications&pw=${userPw}&kuerzel=${userKuerzel}`);
-                const json = await res.json();
-                const notifList = document.getElementById('notifList');
-                const bellBadge = document.getElementById('bellBadge');
-                const bellBtn = document.getElementById('bellBtn');
-                
-                notifList.innerHTML = "";
-                if (json.notifications && json.notifications.length > 0) {
-                    bellBadge.style.display = 'block';
-                    bellBtn.classList.add('active');
-                    json.notifications.forEach(n => {
-                        const item = document.createElement('div');
-                        item.className = 'notif-item';
-                        // Formatierung für das Datum aus der Meldung extrahieren falls nötig, sonst n.date nutzen
-                        item.innerHTML = `<strong>${n.date} - ${n.time}</strong><br>${n.msg}`;
-                        item.onclick = () => {
-                            document.getElementById('datePicker').value = n.date;
-                            loadPlan();
-                            closeDashboard();
-                        };
-                        notifList.appendChild(item);
-                    });
-                } else {
-                    notifList.innerHTML = "Keine neuen Meldungen.";
-                    bellBadge.style.display = 'none';
-                    bellBtn.classList.remove('active');
-                }
-            } catch(e) { console.error("Notify-Error:", e); }
-        }
-
-        async function loadPlan() {
-            const dp = document.getElementById('datePicker');
-            if (pendingChanges.length > 0) {
-                if (!confirm("Du hast ungespeicherte Änderungen. Diese gehen beim Aktualisieren verloren! Trotzdem fortfahren?")) {
-                    dp.value = lastStableDate; 
-                    return;
-                }
+    async function checkLogin() {
+        const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
+        const pwVal = document.getElementById('pwInput').value;
+        const kuerzelVal = document.getElementById('kuerzelInput').value.trim().toLowerCase();
+        if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel fehlt!"; return; }
+        btn.style.display = 'none'; ball.classList.add('active');
+        try {
+            const res = await fetch(`${url}?mode=login&pw=${pwVal}&kuerzel=${kuerzelVal}`);
+            const json = await res.json();
+            if (json.error === "Falsches Passwort") {
+                document.getElementById('loginError').innerText = "Falsches Passwort!";
+                btn.style.display = 'block'; ball.classList.remove('active');
+            } else {
+                userPw = pwVal;
+                userKuerzel = kuerzelVal;
+                document.getElementById('loginOverlay').style.display = 'none';
+                loadPlan();
             }
-            const dateVal = dp.value;
-            if (!userPw || !dateVal) return;
-            lastStableDate = dateVal; 
-            updateNavButtons();
-            const container = document.getElementById('plan');
-            container.innerHTML = ""; 
-            document.getElementById('globalLoader').style.display = 'block';
-            const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
-            const heute = new Date(); heute.setHours(12,0,0,0);
-            const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
-            
-            if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
-            if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
-            if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
-            
-            try {
-                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}&kuerzel=${userKuerzel}`);
-                const json = await res.json();
-                if (json.error === "SPERRE") {
-                    container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
-                    document.getElementById('globalLoader').style.display = 'none';
-                    return;
-                }
-                container.innerHTML = ""; pendingChanges = [];
-                currentPlanData = json.data; 
-                myClasses = json.userClasses || [];
-                allClassTeachers = json.allClassTeachers || {};
-                const data = json.data, options = json.options;
-                
-                // Dashboard bei jedem Laden aktualisieren
-                checkNotifications();
+        } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
+    }
 
-                configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
-                const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-                const [y, m, d] = dateVal.split('-').map(Number);
-                
-                data.forEach((row, rowIndex) => {
-                    if (rowIndex === 0) {
-                        container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
-                    } else {
-                        if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
-                        if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
-                        container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
-                        
-                        for(let i = 1; i <= 5; i++) {
-                            let belegteHallenInZeileOhneMich = [];
-                            for (let k = 1; k <= 5; k++) {
-                                if (k === i) continue; 
-                                let otherVal = String(row[k] || "").trim();
-                                if (otherVal !== "") {
-                                    let resPart = otherVal.split(' | ')[1] || "";
-                                    if (resPart && resPart !== "Ausfall" && resPart !== "Outdoor" && resPart !== "U21") {
-                                        belegteHallenInZeileOhneMich.push(resPart);
-                                    }
+    // --- NEU & ERGÄNZT: Nachricht im Sheet als gelesen markieren ---
+    async function selectNotification(msgId, dateStr) {
+        // 1. Markierung an das Backend senden
+        try {
+            await fetch(url, {
+                method: "POST",
+                body: JSON.stringify({
+                    pw: userPw,
+                    action: "markAsRead",
+                    kuerzel: userKuerzel,
+                    msgId: msgId
+                })
+            });
+        } catch (e) { console.error("Fehler beim Markieren:", e); }
+
+        // 2. Zum Datum springen und laden
+        document.getElementById('datePicker').value = dateStr;
+        closeDashboard();
+        loadPlan(); 
+        
+        // Der Badge wird im loadPlan() durch checkNotifications() automatisch aktualisiert
+    }
+
+    async function checkNotifications() {
+        try {
+            const res = await fetch(`${url}?mode=checkNotifications&pw=${userPw}&kuerzel=${userKuerzel}`);
+            const json = await res.json();
+            const notifList = document.getElementById('notifList');
+            const bellBadge = document.getElementById('bellBadge');
+            const bellBtn = document.getElementById('bellBtn');
+            
+            notifList.innerHTML = "";
+            if (json.notifications && json.notifications.length > 0) {
+                bellBadge.style.display = 'block';
+                bellBtn.classList.add('active');
+                json.notifications.forEach(n => {
+                    const item = document.createElement('div');
+                    item.className = 'notif-item';
+                    item.innerHTML = `<strong>${n.date} - ${n.time}</strong><br>${n.msg}`;
+                    // Hier die neue Funktion aufrufen
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        selectNotification(n.id, n.date);
+                    };
+                    notifList.appendChild(item);
+                });
+            } else {
+                notifList.innerHTML = "Keine neuen Meldungen.";
+                bellBadge.style.display = 'none';
+                bellBtn.classList.remove('active');
+            }
+        } catch(e) { console.error("Notify-Error:", e); }
+    }
+
+    async function loadPlan() {
+        const dp = document.getElementById('datePicker');
+        if (pendingChanges.length > 0) {
+            if (!confirm("Du hast ungespeicherte Änderungen. Diese gehen beim Aktualisieren verloren! Trotzdem fortfahren?")) {
+                dp.value = lastStableDate; 
+                return;
+            }
+        }
+        const dateVal = dp.value;
+        if (!userPw || !dateVal) return;
+        lastStableDate = dateVal; 
+        updateNavButtons();
+        const container = document.getElementById('plan');
+        container.innerHTML = ""; 
+        document.getElementById('globalLoader').style.display = 'block';
+        const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
+        const heute = new Date(); heute.setHours(12,0,0,0);
+        const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
+        
+        if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+        if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+        if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+        
+        try {
+            const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}&kuerzel=${userKuerzel}`);
+            const json = await res.json();
+            if (json.error === "SPERRE") {
+                container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
+                document.getElementById('globalLoader').style.display = 'none';
+                return;
+            }
+            container.innerHTML = ""; pendingChanges = [];
+            currentPlanData = json.data; 
+            myClasses = json.userClasses || [];
+            allClassTeachers = json.allClassTeachers || {};
+            const data = json.data, options = json.options;
+            
+            checkNotifications();
+
+            configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
+            const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+            const [y, m, d] = dateVal.split('-').map(Number);
+            
+            data.forEach((row, rowIndex) => {
+                if (rowIndex === 0) {
+                    container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+                } else {
+                    if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
+                    if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
+                    container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
+                    
+                    for(let i = 1; i <= 5; i++) {
+                        let belegteHallenInZeileOhneMich = [];
+                        for (let k = 1; k <= 5; k++) {
+                            if (k === i) continue; 
+                            let otherVal = String(row[k] || "").trim();
+                            if (otherVal !== "") {
+                                let resPart = otherVal.split(' | ')[1] || "";
+                                if (resPart && resPart !== "Ausfall" && resPart !== "Outdoor" && resPart !== "U21") {
+                                    belegteHallenInZeileOhneMich.push(resPart);
                                 }
                             }
-
-                            let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
-                            let isAusfall = (res === "Ausfall");
-                            let isOutdoor = (res === "Outdoor");
-                            let isU21 = (res === "U21");
-                            let canEdit = myClasses.some(c => klasse.trim() === c.trim());
-                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
-                            let teacher = klasse.split('/').map(k => allClassTeachers[k.trim()] || "").filter(t => t !== "").join(" / ");
-
-                            container.innerHTML += `
-                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''} ${isOutdoor ? 'outdoor-mode' : ''} ${isU21 ? 'u21-mode' : ''}" 
-                                   data-row="${rowIndex}" data-col="${i}"
-                                   oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" style="background-color: ${ (isAusfall || isOutdoor || isU21) ? '' : configFarben[res] || ''}">
-                                   ${stiftHtml}
-                                   <div class="klasse">${klasse}</div>
-                                   <div class="lehrer-info">${teacher}</div>
-                                   <div class="res">${res}</div>
-                                   ${canEdit ? `
-                                   <select onclick="event.stopPropagation()" onchange="addChange(this, '${row[0]}', ${i}, '${klasse}');">
-                                       <option value="">---</option>
-                                       ${options.filter(o => {
-                                           const optName = o[0];
-                                           if (res === optName) return true;
-                                           let istGesperrt = belegteHallenInZeileOhneMich.some(belegt => {
-                                               let belegtParts = belegt.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
-                                               let optParts = optName.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
-                                               return optParts.some(p => belegtParts.includes(p));
-                                           });
-                                           return !istGesperrt;
-                                       }).map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
-                                   </select>
-                                   <select class="extra-select" onclick="event.stopPropagation()" onchange="handleExtraAction(this, '${row[0]}', ${i})">
-                                       <option value="">---</option>
-                                       <option value="outdoor">🌳 Outdoor</option>
-                                       <option value="ausfall">❌ Ausfall</option>
-                                       <option value="kommentar">📝 Notiz hinzufügen</option>
-                                       <option value="delete_comment" class="del-opt">🗑️ Notiz löschen</option>
-                                   </select>` : ''}
-                            </div>`;
                         }
+
+                        let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
+                        let isAusfall = (res === "Ausfall");
+                        let isOutdoor = (res === "Outdoor");
+                        let isU21 = (res === "U21");
+                        let canEdit = myClasses.some(c => klasse.trim() === c.trim());
+                        let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
+                        let teacher = klasse.split('/').map(k => allClassTeachers[k.trim()] || "").filter(t => t !== "").join(" / ");
+
+                        container.innerHTML += `
+                        <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''} ${isOutdoor ? 'outdoor-mode' : ''} ${isU21 ? 'u21-mode' : ''}" 
+                                data-row="${rowIndex}" data-col="${i}"
+                                oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" style="background-color: ${ (isAusfall || isOutdoor || isU21) ? '' : configFarben[res] || ''}">
+                                ${stiftHtml}
+                                <div class="klasse">${klasse}</div>
+                                <div class="lehrer-info">${teacher}</div>
+                                <div class="res">${res}</div>
+                                ${canEdit ? `
+                                <select onclick="event.stopPropagation()" onchange="addChange(this, '${row[0]}', ${i}, '${klasse}');">
+                                    <option value="">---</option>
+                                    ${options.filter(o => {
+                                        const optName = o[0];
+                                        if (res === optName) return true;
+                                        let istGesperrt = belegteHallenInZeileOhneMich.some(belegt => {
+                                            let belegtParts = belegt.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
+                                            let optParts = optName.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
+                                            return optParts.some(p => belegtParts.includes(p));
+                                        });
+                                        return !istGesperrt;
+                                    }).map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                                </select>
+                                <select class="extra-select" onclick="event.stopPropagation()" onchange="handleExtraAction(this, '${row[0]}', ${i})">
+                                    <option value="">---</option>
+                                    <option value="outdoor">🌳 Outdoor</option>
+                                    <option value="ausfall">❌ Ausfall</option>
+                                    <option value="kommentar">📝 Notiz hinzufügen</option>
+                                    <option value="delete_comment" class="del-opt">🗑️ Notiz löschen</option>
+                                </select>` : ''}
+                        </div>`;
                     }
-                });
-            } catch(e) { console.error(e); }
-            document.getElementById('globalLoader').style.display = 'none';
-        }
+                }
+            });
+        } catch(e) { console.error(e); }
+        document.getElementById('globalLoader').style.display = 'none';
+    }
 
-        function getExistingComment(r, c) {
-            let val = (currentPlanData[r] && currentPlanData[r][c]) ? currentPlanData[r][c] : "";
-            let teile = val.split(' | ');
-            return (teile[2] && teile[2].startsWith("KOMMENTAR:")) ? teile[2] : "";
-        }
+    function getExistingComment(r, c) {
+        let val = (currentPlanData[r] && currentPlanData[r][c]) ? currentPlanData[r][c] : "";
+        let teile = val.split(' | ');
+        return (teile[2] && teile[2].startsWith("KOMMENTAR:")) ? teile[2] : "";
+    }
 
-        window.addChange = (el, time, slot, klasse) => { 
-            let res = el.value; const parent = el.parentElement;
-            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
-            parent.classList.remove('ausfall-mode', 'outdoor-mode', 'u21-mode');
-            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
-            parent.style.backgroundColor = configFarben[res] || ""; 
+    window.addChange = (el, time, slot, klasse) => { 
+        let res = el.value; const parent = el.parentElement;
+        const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+        parent.classList.remove('ausfall-mode', 'outdoor-mode', 'u21-mode');
+        parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
+        parent.style.backgroundColor = configFarben[res] || ""; 
+        let comment = getExistingComment(r, c);
+        let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
+        if (comment) finalVal += " | " + comment;
+        if (!currentPlanData[r]) currentPlanData[r] = [];
+        currentPlanData[r][c] = finalVal;
+        pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
+        document.getElementById('saveBtn').style.display = 'block';
+    };
+
+    window.handleExtraAction = (el, time, slot) => {
+        const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
+        const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+        let pureRes = parent.querySelector('.res').innerText.trim();
+        let finalVal = "";
+        if (action === "outdoor") {
+            parent.classList.remove('ausfall-mode', 'u21-mode');
+            parent.classList.add('outdoor-mode');
+            parent.style.backgroundColor = "";
+            parent.querySelector('.res').innerText = "Outdoor";
             let comment = getExistingComment(r, c);
-            let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
-            if (comment) finalVal += " | " + comment;
+            finalVal = klasse + " | Outdoor" + (comment ? " | " + comment : "");
+        } else if (action === "ausfall") { 
+            parent.classList.remove('outdoor-mode', 'u21-mode');
+            parent.classList.add('ausfall-mode'); 
+            parent.style.backgroundColor = "";
+            parent.querySelector('.res').innerText = "Ausfall"; 
+            let comment = getExistingComment(r, c);
+            finalVal = klasse + " | Ausfall" + (comment ? " | " + comment : "");
+        } else if (action === "kommentar") { 
+            const text = prompt("Notiz eingeben:"); 
+            if(text) { 
+                const s = parent.querySelector('.stift'); if (s) s.remove();
+                parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
+                finalVal = klasse + " | " + (pureRes === "" || pureRes === "Outdoor" || pureRes === "Ausfall" || pureRes === "U21" ? pureRes : pureRes) + " | KOMMENTAR:" + text;
+            } 
+        } else if (action === "delete_comment") {
+            const s = parent.querySelector('.stift'); 
+            if (s) { s.remove(); finalVal = klasse + " | " + (pureRes === "" ? "" : pureRes); }
+        }
+        if (finalVal) {
             if (!currentPlanData[r]) currentPlanData[r] = [];
             currentPlanData[r][c] = finalVal;
-            pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
+            pendingChanges.push({ time, slotIndex: slot, val: finalVal });
             document.getElementById('saveBtn').style.display = 'block';
-        };
-
-        window.handleExtraAction = (el, time, slot) => {
-            const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
-            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
-            let pureRes = parent.querySelector('.res').innerText.trim();
-            let finalVal = "";
-            if (action === "outdoor") {
-                parent.classList.remove('ausfall-mode', 'u21-mode');
-                parent.classList.add('outdoor-mode');
-                parent.style.backgroundColor = "";
-                parent.querySelector('.res').innerText = "Outdoor";
-                let comment = getExistingComment(r, c);
-                finalVal = klasse + " | Outdoor" + (comment ? " | " + comment : "");
-            } else if (action === "ausfall") { 
-                parent.classList.remove('outdoor-mode', 'u21-mode');
-                parent.classList.add('ausfall-mode'); 
-                parent.style.backgroundColor = "";
-                parent.querySelector('.res').innerText = "Ausfall"; 
-                let comment = getExistingComment(r, c);
-                finalVal = klasse + " | Ausfall" + (comment ? " | " + comment : "");
-            } else if (action === "kommentar") { 
-                const text = prompt("Notiz eingeben:"); 
-                if(text) { 
-                    const s = parent.querySelector('.stift'); if (s) s.remove();
-                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
-                    finalVal = klasse + " | " + (pureRes === "" || pureRes === "Outdoor" || pureRes === "Ausfall" || pureRes === "U21" ? pureRes : pureRes) + " | KOMMENTAR:" + text;
-                } 
-            } else if (action === "delete_comment") {
-                const s = parent.querySelector('.stift'); 
-                if (s) { s.remove(); finalVal = klasse + " | " + (pureRes === "" ? "" : pureRes); }
-            }
-            if (finalVal) {
-                if (!currentPlanData[r]) currentPlanData[r] = [];
-                currentPlanData[r][c] = finalVal;
-                pendingChanges.push({ time, slotIndex: slot, val: finalVal });
-                document.getElementById('saveBtn').style.display = 'block';
-            }
-            closeAllExtraMenus(); el.value = "";
-        };
-
-        window.startTimer = (el) => { pressTimer = setTimeout(() => { openExtraMenu(el); }, 500); };
-        window.clearTimer = () => clearTimeout(pressTimer);
-        window.handleContextMenu = (e, el) => { e.preventDefault(); e.stopPropagation(); openExtraMenu(el); };
-        function openExtraMenu(el) { 
-            closeAllExtraMenus();
-            const sel = el.querySelector('.extra-select'); 
-            const hatStift = el.querySelector('.stift') !== null;
-            const delOpt = sel.querySelector('.del-opt');
-            if(delOpt) delOpt.style.display = hatStift ? "block" : "none";
-            sel.style.zIndex = "100"; 
-            sel.style.pointerEvents = "all"; 
-            sel.style.opacity = "1"; 
-            setTimeout(() => { if (sel.showPicker) { sel.showPicker(); } else { sel.click(); } }, 50); 
         }
-        
-        window.saveChanges = async () => { 
-            const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
-            btn.style.display = 'none'; ball.classList.add('active');
-            try { 
-                const response = await fetch(url, { 
-                    method: "POST", 
-                    body: JSON.stringify({ 
-                        date: document.getElementById('datePicker').value, 
-                        changes: pendingChanges, 
-                        pw: userPw,
-                        kuerzel: userKuerzel
-                    }) 
-                }); 
-                const result = await response.json();
-                if (result.status === "success") {
-                    pendingChanges = []; 
-                    ball.classList.remove('active'); 
-                    btn.innerText = "Check! ✅"; 
-                    btn.classList.add('success'); 
-                    btn.style.display = 'block'; 
-                    setTimeout(() => { 
-                        btn.style.display = 'none'; 
-                        btn.classList.remove('success'); 
-                        btn.innerText = "SPEICHERN"; 
-                        loadPlan(); // Plan nach dem Speichern neu laden, um Freigaben anderer zu sehen
-                    }, 1000); 
-                } else { throw new Error(); }
-            } catch (e) { 
+        closeAllExtraMenus(); el.value = "";
+    };
+
+    window.startTimer = (el) => { pressTimer = setTimeout(() => { openExtraMenu(el); }, 500); };
+    window.clearTimer = () => clearTimeout(pressTimer);
+    window.handleContextMenu = (e, el) => { e.preventDefault(); e.stopPropagation(); openExtraMenu(el); };
+    function openExtraMenu(el) { 
+        closeAllExtraMenus();
+        const sel = el.querySelector('.extra-select'); 
+        const hatStift = el.querySelector('.stift') !== null;
+        const delOpt = sel.querySelector('.del-opt');
+        if(delOpt) delOpt.style.display = hatStift ? "block" : "none";
+        sel.style.zIndex = "100"; 
+        sel.style.pointerEvents = "all"; 
+        sel.style.opacity = "1"; 
+        setTimeout(() => { if (sel.showPicker) { sel.showPicker(); } else { sel.click(); } }, 50); 
+    }
+    
+    window.saveChanges = async () => { 
+        const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
+        btn.style.display = 'none'; ball.classList.add('active');
+        try { 
+            const response = await fetch(url, { 
+                method: "POST", 
+                body: JSON.stringify({ 
+                    date: document.getElementById('datePicker').value, 
+                    changes: pendingChanges, 
+                    pw: userPw,
+                    kuerzel: userKuerzel
+                }) 
+            }); 
+            const result = await response.json();
+            if (result.status === "success") {
+                pendingChanges = []; 
                 ball.classList.remove('active'); 
+                btn.innerText = "Check! ✅"; 
+                btn.classList.add('success'); 
                 btn.style.display = 'block'; 
-                btn.innerText = "Fehler!"; 
-            }
-        };
+                setTimeout(() => { 
+                    btn.style.display = 'none'; 
+                    btn.classList.remove('success'); 
+                    btn.innerText = "SPEICHERN"; 
+                    loadPlan(); 
+                }, 1000); 
+            } else { throw new Error(); }
+        } catch (e) { 
+            ball.classList.remove('active'); 
+            btn.style.display = 'block'; 
+            btn.innerText = "Fehler!"; 
+        }
+    };
 
-        window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
-        window.goToToday = () => {
-            const dp = document.getElementById('datePicker');
-            const today = new Date();
-            const offset = today.getTimezoneOffset();
-            today.setMinutes(today.getMinutes() - offset);
-            const dateStr = today.toISOString().split('T')[0];
-            dp.value = dateStr;
-            loadPlan();
-        };
+    window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
+    window.goToToday = () => {
+        const dp = document.getElementById('datePicker');
+        const today = new Date();
+        const offset = today.getTimezoneOffset();
+        today.setMinutes(today.getMinutes() - offset);
+        const dateStr = today.toISOString().split('T')[0];
+        dp.value = dateStr;
+        loadPlan();
+    };
 
-        document.addEventListener('DOMContentLoaded', () => { 
-            const today = new Date(); const offset = today.getTimezoneOffset(); today.setMinutes(today.getMinutes() - offset); 
-            const dateStr = today.toISOString().split('T')[0];
-            document.getElementById('datePicker').value = dateStr;
-            lastStableDate = dateStr;
-        });
-    </script>
+    document.addEventListener('DOMContentLoaded', () => { 
+        const today = new Date(); const offset = today.getTimezoneOffset(); today.setMinutes(today.getMinutes() - offset); 
+        const dateStr = today.toISOString().split('T')[0];
+        document.getElementById('datePicker').value = dateStr;
+        lastStableDate = dateStr;
+    });
+</script>
 </body>
 </html>
