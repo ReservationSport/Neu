@@ -105,7 +105,7 @@
         <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
     </div>
 
-    <div id="dashboard">
+    <div id="dashboard" onclick="event.stopPropagation()">
         <h3>Meldungen & Chancen</h3>
         <div id="notifList">Keine neuen Meldungen.</div>
     </div>
@@ -162,8 +162,7 @@
         function toggleDashboard() {
             const db = document.getElementById('dashboard');
             db.style.display = (db.style.display === 'block') ? 'none' : 'block';
-            document.getElementById('bellBadge').style.display = 'none';
-            document.getElementById('bellBtn').classList.remove('active');
+            // Nur beim Öffnen Badge entfernen, wenn man möchte. Hier lassen wir es für die Übersicht
         }
 
         function closeDashboard() {
@@ -186,7 +185,6 @@
                     userPw = pwVal;
                     userKuerzel = kuerzelVal;
                     document.getElementById('loginOverlay').style.display = 'none';
-                    await checkNotifications();
                     loadPlan();
                 }
             } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
@@ -207,6 +205,7 @@
                     json.notifications.forEach(n => {
                         const item = document.createElement('div');
                         item.className = 'notif-item';
+                        // Formatierung für das Datum aus der Meldung extrahieren falls nötig, sonst n.date nutzen
                         item.innerHTML = `<strong>${n.date} - ${n.time}</strong><br>${n.msg}`;
                         item.onclick = () => {
                             document.getElementById('datePicker').value = n.date;
@@ -260,7 +259,8 @@
                 allClassTeachers = json.allClassTeachers || {};
                 const data = json.data, options = json.options;
                 
-                await checkNotifications();
+                // Dashboard bei jedem Laden aktualisieren
+                checkNotifications();
 
                 configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
                 const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
@@ -431,6 +431,7 @@
                         btn.style.display = 'none'; 
                         btn.classList.remove('success'); 
                         btn.innerText = "SPEICHERN"; 
+                        loadPlan(); // Plan nach dem Speichern neu laden, um Freigaben anderer zu sehen
                     }, 1000); 
                 } else { throw new Error(); }
             } catch (e) { 
