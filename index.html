@@ -205,10 +205,9 @@
                         container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
                         
                         for(let i = 1; i <= 5; i++) {
-                            // BELEGUNG PRÜFEN (für diesen spezifischen Slot i)
                             let belegteHallenInZeileOhneMich = [];
                             for (let k = 1; k <= 5; k++) {
-                                if (k === i) continue; // Den eigenen Slot ignorieren!
+                                if (k === i) continue;
                                 let otherVal = String(row[k] || "").trim();
                                 if (otherVal !== "") {
                                     let resPart = otherVal.split(' | ')[1] || "";
@@ -238,9 +237,7 @@
                                        <option value="">---</option>
                                        ${options.filter(o => {
                                            const optName = o[0];
-                                           // Wenn es die aktuell gewählte Option ist, immer anzeigen
                                            if (res === optName) return true;
-                                           // Prüfen ob Teile dieser Option bereits von KOLLEGEN belegt sind
                                            let istGesperrt = belegteHallenInZeileOhneMich.some(belegt => {
                                                let belegtParts = belegt.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
                                                let optParts = optName.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
@@ -271,18 +268,30 @@
         }
 
         window.addChange = (el, time, slot, klasse) => { 
-            let res = el.value; const parent = el.parentElement;
+            let res = el.value; 
+            const parent = el.parentElement;
             const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+            
             parent.classList.remove('ausfall-mode', 'outdoor-mode');
-            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
-            parent.style.backgroundColor = configFarben[res] || ""; 
+            
+            if (res === "" || res === "---") {
+                parent.querySelector('.res').innerText = ""; 
+                parent.style.backgroundColor = ""; 
+            } else {
+                parent.querySelector('.res').innerText = res; 
+                parent.style.backgroundColor = configFarben[res] || ""; 
+            }
+
             let comment = getExistingComment(r, c);
             let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
             if (comment) finalVal += " | " + comment;
+
             if (!currentPlanData[r]) currentPlanData[r] = [];
             currentPlanData[r][c] = finalVal;
+            
             pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
             document.getElementById('saveBtn').style.display = 'block';
+            el.blur(); 
         };
 
         window.handleExtraAction = (el, time, slot) => {
