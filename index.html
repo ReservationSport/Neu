@@ -1,210 +1,820 @@
-const SECRET_PASSWORD = "bbzo"; 
+ <!DOCTYPE html>
 
-/**
- * Hilfsfunktion zur Berechnung der Kalenderwoche (ISO-8601)
- */
-function getWeekNumber(d) {
-  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return weekNo;
-}
+<html lang="de">
 
-function getJsonCache_(key, ttlSeconds) {
-  const cache = CacheService.getScriptCache();
-  const raw = cache.get(key);
-  if (raw) {
-    try { return JSON.parse(raw); } catch (e) {}
-  }
-  return null;
-}
+<head>
 
-function putJsonCache_(key, value, ttlSeconds) {
-  try {
-    CacheService.getScriptCache().put(key, JSON.stringify(value), ttlSeconds);
-  } catch (e) {}
-}
+    <meta charset="UTF-8">
 
-function doGet(e) {
-  const providedPassword = e.parameter.pw;
-  const userKuerzel = e.parameter.kuerzel ? e.parameter.kuerzel.toLowerCase().trim() : "";
+    <title>Reservation Sport</title>
 
-  if (providedPassword !== SECRET_PASSWORD) {
-    return ContentService.createTextOutput(JSON.stringify({error: "Falsches Passwort"}))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const dateStr = e.parameter.date; 
-  const targetDate = new Date(dateStr);
-  targetDate.setHours(0,0,0,0);
+    <style>
 
-  // --- 1. SPERRZEITEN & U21-LOGIK ---
-  const sperrSheet = ss.getSheetByName("Sperrzeiten");
-  let targetSlot = null;
-  let sperrMsg = null;
-  const kwHeute = getWeekNumber(targetDate);
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; }
 
-  if (sperrSheet) {
-    // NICHT cachen: JSON-Cache verliert Date-Objekte -> Sperrtage würden nicht mehr erkannt.
-    const sperrData = sperrSheet.getDataRange().getValues();
+        .grid { display: grid; grid-template-columns: 120px repeat(5, 1fr); gap: 2px; max-width: 1000px; margin: auto; }
 
-    for (let i = 1; i < sperrData.length; i++) {
-      // Check auf Sperrtag (Spalte A)
-      let cellValue = sperrData[i][0];
-      if (cellValue instanceof Date) {
-        let sDate = new Date(cellValue);
-        sDate.setHours(0,0,0,0);
-        if (sDate.getTime() === targetDate.getTime()) {
-          sperrMsg = sperrData[i][1] || "Sperrtag";
-        }
-      }
+        .date-control { text-align: center; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
 
-      // Check auf U21-Woche (Spalte D = Index 3, Spalte E = Index 4)
-      let kwImSheet = sperrData[i][3]; 
-      let u21Woche = sperrData[i][4];
-      
-      if (kwImSheet == kwHeute) {
-        let sw = parseInt(u21Woche);
-        if (sw >= 1 && sw <= 5) {
-          targetSlot = sw;
-        }
-      }
-    }
-  }
+        
 
-  // Falls ein Sperrtag gefunden wurde, sofort abbrechen
-  if (sperrMsg) {
-    return ContentService.createTextOutput(JSON.stringify({error: "SPERRE", msg: sperrMsg}))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+        .global-loader { position: absolute; left: 20px; width: 30px; height: 30px; border: 4px solid #444; border-top: 4px solid #27ae60; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
 
-  // --- 2. NUTZER-ZUORDNUNG ---
-  let userClasses = [];
-  let allClassTeachers = {}; 
-  const nutzerSheet = ss.getSheetByName("Nutzer");
-  if (nutzerSheet) {
-    const cacheKey = "nutzer_v1";
-    let nutzerData = getJsonCache_(cacheKey);
-    if (!nutzerData) {
-      nutzerData = nutzerSheet.getDataRange().getDisplayValues();
-      putJsonCache_(cacheKey, nutzerData, 300);
-    }
-    for (let i = 0; i < nutzerData.length; i++) {
-      let kuerzel = nutzerData[i][0].toString().trim();
-      let klasse = nutzerData[i][1].toString().trim();
-      if (kuerzel && klasse) {
-        allClassTeachers[klasse] = kuerzel.toLowerCase();
-        if (userKuerzel && kuerzel.toLowerCase() === userKuerzel) {
-          userClasses.push(klasse);
-        }
-      }
-    }
-  }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-  // --- 3. SHEET LADEN ODER MASTER KOPIEREN ---
-  let sheet = ss.getSheetByName("Tabelle_" + dateStr);
-  if (!sheet) {
-    const wochentage = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-    const masterSheet = ss.getSheetByName("Master_" + wochentage[targetDate.getDay()]);
-    if (masterSheet) {
-      sheet = masterSheet.copyTo(ss).setName("Tabelle_" + dateStr);
-    } else {
-      return ContentService.createTextOutput(JSON.stringify({error: "Kein Master gefunden"})).setMimeType(ContentService.MimeType.JSON);
-    }
-  }
+        
 
-  // --- 4. OPTIONEN LADEN ---
-  const configSheet = ss.getSheetByName("Konfiguration");
-  let options = [];
-  if (configSheet) {
-    const cacheKey = "konfiguration_v1";
-    options = getJsonCache_(cacheKey);
-    if (!options) {
-      options = configSheet.getRange(1,1,configSheet.getLastRow(),2).getValues();
-      putJsonCache_(cacheKey, options, 300);
-    }
-  }
+        .nav-group { display: flex; gap: 5px; }
 
-  // Performance: Tagesdaten kurz cachen (wird bei doPost invalidiert)
-  const dayDataCacheKey = "daydata_v1_" + dateStr;
-  let data = getJsonCache_(dayDataCacheKey);
-  if (!data) {
-    data = sheet.getDataRange().getDisplayValues();
-    putJsonCache_(dayDataCacheKey, data, 30);
-  }
+        #datePicker { padding: 10px; background: #333; color: white; border: 1px solid #444; height: 40px; box-sizing: border-box; cursor: pointer; border-radius: 4px; }
 
-  // --- 5. AUTOMATISCHE U21 ZUWEISUNG ---
-  if (targetSlot !== null) {
-    data = data.map((row, rowIndex) => {
-      if (rowIndex === 0) return row;
+        .nav-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; border-radius: 4px; }
 
-      let klassenOhneHalle = 0;
-      for (let s = 1; s <= 5; s++) {
-        let inhalt = row[s].trim();
-        if (inhalt !== "" && !inhalt.includes("|")) {
-          klassenOhneHalle++;
-        }
-      }
+        .nav-btn:hover { background: #444; }
 
-      if (klassenOhneHalle === 5) {
-        row[targetSlot] = row[targetSlot].trim() + " | U21";
-      }
-      return row;
-    });
-  }
+        
 
-  return ContentService.createTextOutput(JSON.stringify({
-    data: data, 
-    options: options, 
-    userClasses: userClasses, 
-    allClassTeachers: allClassTeachers
-  })).setMimeType(ContentService.MimeType.JSON);
-}
+        .refresh-btn { height: 40px; width: 40px; background: #333; border: 1px solid #444; color: #e67e22; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; border-radius: 4px; margin-left: 10px; }
 
-function doPost(e) {
-  const payload = JSON.parse(e.postData.contents);
-  if (payload.pw !== SECRET_PASSWORD) return;
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Tabelle_" + payload.date);
-  if (sheet) {
-    const data = sheet.getDataRange().getValues();
-    const rowIndexByTime = {};
-    for (let r = 0; r < data.length; r++) {
-      rowIndexByTime[String(data[r][0])] = r;
-    }
+        .refresh-btn:hover { background: #444; color: #ff9f43; }
 
-    // Performance: Änderungen nach Zeile bündeln, dann pro betroffener Zeile einmal schreiben.
-    // Achtung: slotIndex ist 1..5 (Spalten B..F), time sitzt in Spalte A.
-    const updatesByRow = {};
-    payload.changes.forEach(c => {
-      const rIdx = rowIndexByTime[String(c.time)];
-      if (rIdx === undefined) return;
-      if (!updatesByRow[rIdx]) updatesByRow[rIdx] = {};
-      updatesByRow[rIdx][c.slotIndex] = c.val;
-    });
+        .refresh-btn:active i { animation: spin-once 0.5s ease-in-out; }
 
-    Object.keys(updatesByRow)
-      .map(k => parseInt(k, 10))
-      .sort((a, b) => a - b)
-      .forEach(rIdx => {
-      // Hole aktuelle Werte der 5 Slots (B..F) und überschreibe nur betroffene Slots.
-      const slotRange = sheet.getRange(rIdx + 1, 2, 1, 5);
-      const rowSlots = slotRange.getValues(); // [[b,c,d,e,f]]
-      const updates = updatesByRow[rIdx];
-      Object.keys(updates)
-        .map(k => parseInt(k, 10))
-        .sort((a, b) => a - b)
-        .forEach(slotIndex => {
-          if (slotIndex >= 1 && slotIndex <= 5) {
-            rowSlots[0][slotIndex - 1] = updates[String(slotIndex)];
-          }
-        });
-      slotRange.setValues(rowSlots);
-    });
+        @keyframes spin-once { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    // invalidate cached day data so next load is fresh
-    try { CacheService.getScriptCache().remove("daydata_v1_" + payload.date); } catch (e) {}
-    return ContentService.createTextOutput(JSON.stringify({status: "success"})).setMimeType(ContentService.MimeType.JSON);
-  }
-}
+
+        .box { border: 1px solid #444; padding: 5px; background: #262626; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; position: relative; cursor: pointer; overflow: hidden; }
+
+        .box.empty { pointer-events: none; opacity: 0.5; }
+
+        
+
+        .box.not-mine { pointer-events: none !important; } 
+
+        .box.is-mine { border: 2px solid #e67e22 !important; z-index: 10; box-shadow: inset 0 0 10px rgba(230,126,34,0.3); }
+
+
+        .box.ausfall-mode { background-color: #000000 !important; color: #777777 !important; background-image: linear-gradient(to top right, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #444, transparent calc(50% + 1px)); }
+
+        .box.ausfall-mode .klasse { color: #777777; }
+
+        .box.ausfall-mode .res { color: #555555; }
+
+        .box.ausfall-mode .lehrer-info { display: none; }
+
+
+        .box.outdoor-mode { background-color: #27ae60 !important; color: white !important; }
+
+        .box.outdoor-mode .res { font-weight: bold; }
+
+
+        .stift { position: absolute; top: 2px; right: 4px; z-index: 50; color: #e67e22; cursor: pointer; pointer-events: auto; display: inline-block; font-size: 22px; line-height: 1; text-shadow: 0 0 5px rgba(0,0,0,1); transition: transform 0.2s ease; }
+
+        .stift:hover { transform: scale(1.2); color: #ff9f43; }
+
+
+        .zeit-box { background: #333; font-weight: bold; cursor: default; }
+
+        .header-row { grid-column: span 6; background: #333; font-size: 14px; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; height: 50px; }
+
+        .info-box { grid-column: span 6; padding: 40px; text-align: center; color: #d1d1d1; font-style: italic; font-size: 18px; }
+
+        
+
+        #loginOverlay { 
+
+            position: fixed; 
+
+            top: 0; 
+
+            left: 0; 
+
+            width: 100%; 
+
+            height: 100%; 
+
+            background: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url('https://raw.githubusercontent.com/ReservationSport/ReservationSport/refs/heads/main/Logo.png');
+
+            background-size: cover;
+
+            background-position: center;
+
+            z-index: 2000; 
+
+            display: flex; 
+
+            flex-direction: column; 
+
+            justify-content: center; 
+
+            align-items: center; 
+
+        }
+
+        #loginOverlay h2 { color: #e67e22; font-size: 2.2em; margin-bottom: 30px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
+
+        #loginOverlay input { padding: 15px; margin: 8px; background: rgba(34, 34, 34, 0.85); border: 1px solid #444; color: white; border-radius: 8px; width: 280px; font-size: 16px; outline: none; backdrop-filter: blur(5px); }
+
+        #loginOverlay input:focus { border-color: #e67e22; }
+
+        #loginOverlay button { padding: 15px; margin-top: 15px; background: #e67e22; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 310px; font-size: 18px; transition: background 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+
+        #loginOverlay button:hover { background: #d35400; }
+
+        
+
+        .klasse { font-weight: bold; }
+
+        .lehrer-info { font-size: 9px; color: #aaa; margin-top: 1px; }
+
+        .res { font-style: italic; font-size: 9px; margin-top: 2px; position: relative; z-index: 10; }
+
+        select { width: 100%; height: 100%; position: absolute; top: 0; left: 0; opacity: 0; cursor: pointer; z-index: 5; }
+
+        .save-container { position: absolute; right: 10px; z-index: 10; display: flex; align-items: center; height: 40px; }
+
+        .save-btn { padding: 8px 20px; background: #e67e22; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; display: none; transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+
+        .save-btn.success { background: #27ae60; } 
+
+        .sport-loader { font-size: 20px; visibility: hidden; animation: bounce 0.6s infinite alternate; }
+
+        .sport-loader.active { visibility: visible; }
+
+        @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-10px); } }
+
+        
+
+        .divider-thin { grid-column: 1 / span 6; height: 1px; background: #444; margin: 2px 0; }
+
+        .divider-thick { grid-column: 1 / span 6; height: 4px; background: #444; margin: 5px 0; }
+
+        .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; display: none; }
+
+    </style>
+
+</head>
+
+<body onclick="closeAllExtraMenus()">
+
+    <div id="loginOverlay">
+
+        <h2>Reservation Sport</h2>
+        <div id="loginTodayDate" style="margin-top:-18px;margin-bottom:22px;color:#d1d1d1;font-size:16px;"></div>
+
+        <input type="text" id="kuerzelInput" placeholder="Kürzel" oninput="document.getElementById('loginError').innerText=''">
+
+        <input type="password" id="pwInput" placeholder="Passwort" oninput="document.getElementById('loginError').innerText=''">
+
+        <button id="loginBtn" onclick="checkLogin()">Anmelden</button>
+
+        <div id="loginBall" class="sport-loader" style="margin-top: 10px;">🏀</div>
+
+        <p id="loginError" style="color: #e74c3c; margin-top: 10px;"></p>
+
+    </div>
+
+
+    <div class="date-control">
+
+        <div id="globalLoader" class="global-loader"></div>
+
+        <div class="nav-group">
+
+            <button id="btnPrevWeek" class="nav-btn" onclick="changeDate(-7)">⏮</button>
+
+            <button id="btnPrevDay" class="nav-btn" onclick="changeDate(-1)">◀</button>
+
+        </div>
+
+        <button id="btnToday" class="nav-btn" onclick="goToToday()" title="Heute"><i class="fas fa-house"></i></button>
+
+        <input type="date" id="datePicker" onchange="loadPlan()">
+
+        <div class="nav-group" style="display: flex; align-items: center;">
+
+            <button class="nav-btn" onclick="changeDate(1)">▶</button>
+
+            <button class="nav-btn" onclick="changeDate(7)">⏭</button>
+
+            <button class="refresh-btn" onclick="loadPlan()" title="Tag aktualisieren">
+
+                <i class="fas fa-sync-alt"></i>
+
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="grid" id="plan"></div>
+
+
+    <script>
+
+        const url = "https://script.google.com/macros/s/AKfycbynst5mMRtftD614vNswGy4VG4or2n4m9cnF4Om8UU4uYOO3IdnRgclGu1EqMefxbwz/exec"; 
+
+        let pendingChanges = [], configFarben = {}, userPw = "", userKuerzel = "", pressTimer;
+
+        let currentPlanData = [], lastStableDate = "", myClasses = [], allClassTeachers = {};
+
+
+        window.addEventListener('beforeunload', (e) => {
+
+            if (pendingChanges.length > 0) { e.preventDefault(); e.returnValue = ''; }
+
+        });
+
+
+        function updateNavButtons() {
+
+            const dp = document.getElementById('datePicker');
+
+            const currentDate = new Date(dp.value); currentDate.setHours(12, 0, 0, 0);
+
+            const heute = new Date(); heute.setHours(12, 0, 0, 0);
+
+            const yesterday = new Date(currentDate); yesterday.setDate(yesterday.getDate() - 1);
+
+            const lastWeek = new Date(currentDate); lastWeek.setDate(lastWeek.getDate() - 7);
+
+            document.getElementById('btnPrevDay').style.visibility = (yesterday < heute) ? 'hidden' : 'visible';
+
+            document.getElementById('btnPrevWeek').style.visibility = (lastWeek < heute) ? 'hidden' : 'visible';
+
+        }
+
+
+        function closeAllExtraMenus() {
+
+            document.querySelectorAll('.extra-select').forEach(sel => {
+
+                sel.style.zIndex = "-1";
+
+                sel.style.pointerEvents = "none";
+
+                sel.style.opacity = "0";
+                sel.style.display = "none";
+                if (sel.blur) sel.blur();
+
+            });
+
+        }
+
+
+        async function checkLogin() {
+
+            const btn = document.getElementById('loginBtn'), ball = document.getElementById('loginBall');
+
+            const pwVal = document.getElementById('pwInput').value;
+
+            const kuerzelVal = document.getElementById('kuerzelInput').value.trim().toLowerCase();
+
+            if(!kuerzelVal) { document.getElementById('loginError').innerText = "Kürzel fehlt!"; return; }
+
+            btn.style.display = 'none'; ball.classList.add('active');
+
+            try {
+
+                const res = await fetch(`${url}?mode=login&pw=${pwVal}&kuerzel=${kuerzelVal}`);
+
+                const json = await res.json();
+
+                if (json.error === "Falsches Passwort") {
+
+                    document.getElementById('loginError').innerText = "Falsches Passwort!";
+
+                    btn.style.display = 'block'; ball.classList.remove('active');
+
+                } else {
+
+                    userPw = pwVal;
+
+                    userKuerzel = kuerzelVal;
+
+                    document.getElementById('loginOverlay').style.display = 'none';
+
+                    loadPlan();
+
+                }
+
+            } catch(e) { document.getElementById('loginError').innerText = "Fehler."; btn.style.display = 'block'; ball.classList.remove('active'); }
+
+        }
+
+
+        async function loadPlan() {
+
+            const dp = document.getElementById('datePicker');
+
+            if (pendingChanges.length > 0) {
+
+                if (!confirm("Du hast ungespeicherte Änderungen. Diese gehen beim Aktualisieren verloren! Trotzdem fortfahren?")) {
+
+                    dp.value = lastStableDate; 
+
+                    return;
+
+                }
+
+            }
+
+            const dateVal = dp.value;
+
+            if (!userPw || !dateVal) return;
+
+            lastStableDate = dateVal; 
+
+            updateNavButtons();
+
+            const container = document.getElementById('plan');
+
+            container.innerHTML = ""; 
+
+            document.getElementById('globalLoader').style.display = 'block';
+
+            const dateObj = new Date(dateVal); dateObj.setHours(12,0,0,0);
+
+            const heute = new Date(); heute.setHours(12,0,0,0);
+
+            const vierWochen = new Date(); vierWochen.setDate(heute.getDate() + 28);
+
+            
+
+            if (dateObj < heute) { container.innerHTML = `<div class="box info-box">Lebst du in der Vergangenheit?</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+
+            if (dateObj > vierWochen) { container.innerHTML = `<div class="box info-box">Die Zukunft ist noch nicht bereit...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+
+            if (dateObj.getDay() === 0 || dateObj.getDay() === 6) { container.innerHTML = `<div class="box info-box">Mach mal Pause! Es ist Wochenende...</div>`; document.getElementById('globalLoader').style.display = 'none'; return; }
+
+            
+
+            try {
+
+                const res = await fetch(`${url}?date=${dateVal}&pw=${userPw}&kuerzel=${userKuerzel}`);
+
+                const json = await res.json();
+
+                if (json.error === "SPERRE") {
+
+                    container.innerHTML = `<div class="box info-box">${json.msg}</div>`;
+
+                    document.getElementById('globalLoader').style.display = 'none';
+
+                    return;
+
+                }
+
+                container.innerHTML = ""; pendingChanges = [];
+
+                currentPlanData = json.data; 
+
+                myClasses = json.userClasses || [];
+
+                allClassTeachers = json.allClassTeachers || {};
+
+                const data = json.data, options = json.options;
+
+                configFarben = {}; options.forEach(opt => configFarben[opt[0]] = opt[1]);
+
+                const wtArr = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+
+                const [y, m, d] = dateVal.split('-').map(Number);
+
+                // Performance: schnelle Lookups + Option-Parts nur einmal vorbereiten
+                const myClassesSet = new Set(myClasses.map(c => String(c).trim()));
+                const optionMeta = options.map(o => {
+                    const name = o[0];
+                    const parts = String(name).split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
+                    return { name, parts };
+                });
+                
+
+                // Performance: HTML zuerst im Speicher aufbauen und einmalig setzen (verhindert viele Reflows).
+                let html = "";
+
+                data.forEach((row, rowIndex) => {
+
+                    if (rowIndex === 0) {
+
+                        html += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+
+                    } else {
+
+                        if (rowIndex === 4 || rowIndex === 10) html += `<div class="divider-thin"></div>`;
+
+                        if (rowIndex === 7) html += `<div class="divider-thick"></div>`;
+
+                        html += `<div class="box zeit-box">${row[0]}</div>`;
+
+                        
+
+                        // Pro Zeile einmalig belegte Parts je Slot vorbereiten (verhindert viele split/filter in Options-Filter)
+                        const belegtePartsBySlot = {};
+                        for (let k = 1; k <= 5; k++) {
+                            let otherVal = String(row[k] || "").trim();
+                            if (otherVal !== "") {
+                                let resPart = otherVal.split(' | ')[1] || "";
+                                if (resPart && resPart !== "Ausfall" && resPart !== "Outdoor") {
+                                    belegtePartsBySlot[k] = String(resPart).split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
+                                }
+                            }
+                        }
+
+                        for(let i = 1; i <= 5; i++) {
+
+                            // BELEGUNG PRÜFEN (für diesen spezifischen Slot i)
+                            const otherBelegteParts = [];
+                            for (let k = 1; k <= 5; k++) {
+                                if (k === i) continue;
+                                if (belegtePartsBySlot[k]) otherBelegteParts.push(belegtePartsBySlot[k]);
+                            }
+
+
+                            let val = row[i] || "", teile = val.split(' | '), klasse = teile[0], res = teile[1] || "", kommentar = teile[2] || "";
+
+                            let isAusfall = (res === "Ausfall");
+
+                            let isOutdoor = (res === "Outdoor");
+
+                            let canEdit = myClassesSet.has(klasse.trim());
+
+                            let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
+
+                            let teacher = klasse.split('/').map(k => allClassTeachers[k.trim()] || "").filter(t => t !== "").join(" / ");
+
+
+                            html += `
+
+                            <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''} ${isOutdoor ? 'outdoor-mode' : ''}" 
+
+                                   data-row="${rowIndex}" data-col="${i}"
+
+                                   oncontextmenu="${canEdit ? 'handleContextMenu(event, this)' : ''}" ontouchstart="${canEdit ? 'startTimer(this)' : ''}" ontouchend="clearTimer()" style="background-color: ${ (isAusfall || isOutdoor) ? '' : configFarben[res] || ''}">
+
+                                   ${stiftHtml}
+
+                                   <div class="klasse">${klasse}</div>
+
+                                   <div class="lehrer-info">${teacher}</div>
+
+                                   <div class="res">${res}</div>
+
+                                   ${canEdit ? `
+
+                                   <select onclick="event.stopPropagation()" onchange="addChange(this, '${row[0]}', ${i}, '${klasse}');">
+
+                                       <option value="">---</option>
+                                       ${(res === "Outdoor" || res === "Ausfall") ? `<option value="${res}" selected style="display:none">${res}</option>` : ``}
+
+                                       ${optionMeta.filter(({name, parts}) => {
+                                           // Wenn es die aktuell gewählte Option ist, immer anzeigen
+                                           if (res === name) return true;
+                                           // Prüfen ob Teile dieser Option bereits von KOLLEGEN belegt sind
+                                           for (let b = 0; b < otherBelegteParts.length; b++) {
+                                               const belegtParts = otherBelegteParts[b];
+                                               for (let p = 0; p < parts.length; p++) {
+                                                   if (belegtParts.includes(parts[p])) return false;
+                                               }
+                                           }
+                                           return true;
+                                       }).map(({name}) => `<option value="${name}" ${res === name ? 'selected' : ''}>${name}</option>`).join('')}
+
+                                   </select>
+
+                                   <select class="extra-select" onclick="event.stopPropagation()" onchange="handleExtraAction(this, '${row[0]}', ${i})">
+
+                                       <option value="">---</option>
+
+                                       <option value="outdoor">🌳 Outdoor</option>
+
+                                       <option value="ausfall">❌ Ausfall</option>
+
+                                       <option value="kommentar">📝 Notiz hinzufügen</option>
+
+                                       <option value="delete_comment" class="del-opt">🗑️ Notiz löschen</option>
+
+                                   </select>` : ''}
+
+                            </div>`;
+
+                        }
+
+                    }
+
+                });
+
+                container.innerHTML = html;
+
+            } catch(e) { console.error(e); }
+
+            document.getElementById('globalLoader').style.display = 'none';
+
+        }
+
+
+        function getExistingComment(r, c) {
+
+            let val = (currentPlanData[r] && currentPlanData[r][c]) ? currentPlanData[r][c] : "";
+
+            let teile = val.split(' | ');
+
+            return (teile[2] && teile[2].startsWith("KOMMENTAR:")) ? teile[2] : "";
+
+        }
+
+
+        window.addChange = (el, time, slot, klasse) => { 
+
+            let res = el.value; const parent = el.parentElement;
+
+            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+
+            parent.classList.remove('ausfall-mode', 'outdoor-mode');
+
+            parent.querySelector('.res').innerText = (res === "" || res === "---") ? "" : res; 
+
+            parent.style.backgroundColor = configFarben[res] || ""; 
+
+            let comment = getExistingComment(r, c);
+
+            let finalVal = (res === "" || res === "---") ? klasse : klasse + " | " + res;
+
+            if (comment) finalVal += " | " + comment;
+
+            if (!currentPlanData[r]) currentPlanData[r] = [];
+
+            currentPlanData[r][c] = finalVal;
+
+            pendingChanges.push({ time, slotIndex: slot, val: finalVal }); 
+
+            document.getElementById('saveBtn').style.display = 'block';
+
+        };
+
+
+        window.handleExtraAction = (el, time, slot) => {
+
+            const action = el.value, parent = el.parentElement, klasse = parent.querySelector('.klasse').innerText;
+
+            const r = parent.getAttribute('data-row'), c = parent.getAttribute('data-col');
+
+            let pureRes = parent.querySelector('.res').innerText.trim();
+
+            let finalVal = "";
+            const ensureHiddenOption = (sel, value) => {
+                if (!sel) return;
+                let opt = sel.querySelector(`option[value="${value}"]`);
+                if (!opt) {
+                    opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = value;
+                    opt.hidden = true;
+                    sel.appendChild(opt);
+                }
+            };
+
+            // Wenn im Extra-Menü "---" gewählt wird: Outdoor/Ausfall entfernen (und als Änderung speichern).
+            if (action === "") {
+                if (pureRes === "Outdoor" || pureRes === "Ausfall") {
+                    parent.classList.remove('ausfall-mode', 'outdoor-mode');
+                    parent.style.backgroundColor = "";
+                    parent.querySelector('.res').innerText = "";
+
+                    const mainSelect = parent.querySelector('select:not(.extra-select)');
+                    if (mainSelect) mainSelect.value = "";
+
+                    const comment = getExistingComment(r, c);
+                    finalVal = klasse + (comment ? " | " + comment : "");
+                }
+
+                if (finalVal) {
+                    if (!currentPlanData[r]) currentPlanData[r] = [];
+                    currentPlanData[r][c] = finalVal;
+                    pendingChanges.push({ time, slotIndex: slot, val: finalVal });
+                    document.getElementById('saveBtn').style.display = 'block';
+                }
+
+                closeAllExtraMenus(); el.value = "";
+                return;
+            }
+
+            if (action === "outdoor") {
+
+                parent.classList.remove('ausfall-mode');
+
+                parent.classList.add('outdoor-mode');
+
+                parent.style.backgroundColor = "";
+
+                parent.querySelector('.res').innerText = "Outdoor";
+                const mainSelect = parent.querySelector('select:not(.extra-select)');
+                if (mainSelect) { ensureHiddenOption(mainSelect, "Outdoor"); mainSelect.value = "Outdoor"; }
+
+                let comment = getExistingComment(r, c);
+
+                finalVal = klasse + " | Outdoor" + (comment ? " | " + comment : "");
+
+            } else if (action === "ausfall") { 
+
+                parent.classList.remove('outdoor-mode');
+
+                parent.classList.add('ausfall-mode'); 
+
+                parent.style.backgroundColor = "";
+
+                parent.querySelector('.res').innerText = "Ausfall"; 
+                const mainSelect = parent.querySelector('select:not(.extra-select)');
+                if (mainSelect) { ensureHiddenOption(mainSelect, "Ausfall"); mainSelect.value = "Ausfall"; }
+
+                let comment = getExistingComment(r, c);
+
+                finalVal = klasse + " | Ausfall" + (comment ? " | " + comment : "");
+
+            } else if (action === "kommentar") { 
+
+                const text = prompt("Notiz eingeben:"); 
+
+                if(text) { 
+
+                    const s = parent.querySelector('.stift'); if (s) s.remove();
+
+                    parent.innerHTML += `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${text}')"><i class="fas fa-comment-dots"></i></span>`;
+
+                    finalVal = klasse + " | " + (pureRes === "" || pureRes === "Outdoor" || pureRes === "Ausfall" ? pureRes : pureRes) + " | KOMMENTAR:" + text;
+
+                } 
+
+            } else if (action === "delete_comment") {
+
+                const s = parent.querySelector('.stift'); 
+
+                if (s) { s.remove(); finalVal = klasse + " | " + (pureRes === "" ? "" : pureRes); }
+
+            }
+
+            if (finalVal) {
+
+                if (!currentPlanData[r]) currentPlanData[r] = [];
+
+                currentPlanData[r][c] = finalVal;
+
+                pendingChanges.push({ time, slotIndex: slot, val: finalVal });
+
+                document.getElementById('saveBtn').style.display = 'block';
+
+            }
+
+            closeAllExtraMenus(); el.value = "";
+
+        };
+
+
+        window.startTimer = (el) => { pressTimer = setTimeout(() => { openExtraMenu(el); }, 500); };
+
+        window.clearTimer = () => clearTimeout(pressTimer);
+
+        window.handleContextMenu = (e, el) => { e.preventDefault(); e.stopPropagation(); openExtraMenu(el); };
+
+        function openExtraMenu(el) { 
+
+            closeAllExtraMenus();
+
+            const sel = el.querySelector('.extra-select'); 
+            const currentRes = (el.querySelector('.res')?.innerText || "").trim();
+
+            const hatStift = el.querySelector('.stift') !== null;
+
+            const delOpt = sel.querySelector('.del-opt');
+
+            if(delOpt) delOpt.style.display = hatStift ? "block" : "none";
+
+            // Beim Öffnen den aktuellen Zustand vorselektieren, damit nicht immer "---" im Fokus ist.
+            if (currentRes === "Outdoor") sel.value = "outdoor";
+            else if (currentRes === "Ausfall") sel.value = "ausfall";
+            else sel.value = "";
+
+            sel.style.display = "block";
+            sel.style.zIndex = "100"; 
+
+            sel.style.pointerEvents = "all"; 
+
+            sel.style.opacity = "1"; 
+
+            setTimeout(() => { if (sel.showPicker) { sel.showPicker(); } else { sel.click(); } }, 50); 
+
+        }
+
+        
+
+        window.saveChanges = async () => { 
+
+            const btn = document.getElementById('saveBtn'), ball = document.getElementById('sport-loader'); 
+
+            btn.style.display = 'none'; ball.classList.add('active');
+
+            try { 
+
+                const response = await fetch(url, { 
+
+                    method: "POST", 
+
+                    body: JSON.stringify({ 
+
+                        date: document.getElementById('datePicker').value, 
+
+                        changes: pendingChanges, 
+
+                        pw: userPw,
+
+                        kuerzel: userKuerzel
+
+                    }) 
+
+                }); 
+
+                const result = await response.json();
+
+                if (result.status === "success") {
+
+                    pendingChanges = []; 
+
+                    ball.classList.remove('active'); 
+
+                    btn.innerText = "Check! ✅"; 
+
+                    btn.classList.add('success'); 
+
+                    btn.style.display = 'block'; 
+
+                    setTimeout(() => { 
+
+                        btn.style.display = 'none'; 
+
+                        btn.classList.remove('success'); 
+
+                        btn.innerText = "SPEICHERN"; 
+
+                    }, 1000); 
+
+                } else { throw new Error(); }
+
+            } catch (e) { 
+
+                ball.classList.remove('active'); 
+
+                btn.style.display = 'block'; 
+
+                btn.innerText = "Fehler!"; 
+
+            }
+
+        };
+
+
+        window.changeDate = (days) => { const dp = document.getElementById('datePicker'); let d = new Date(dp.value); d.setDate(d.getDate() + days); dp.valueAsDate = d; loadPlan(); };
+
+        window.goToToday = () => {
+
+            const dp = document.getElementById('datePicker');
+
+            const today = new Date();
+
+            const offset = today.getTimezoneOffset();
+
+            today.setMinutes(today.getMinutes() - offset);
+
+            const dateStr = today.toISOString().split('T')[0];
+
+            dp.value = dateStr;
+
+            loadPlan();
+
+        };
+
+
+        document.addEventListener('DOMContentLoaded', () => { 
+
+            const today = new Date(); const offset = today.getTimezoneOffset(); today.setMinutes(today.getMinutes() - offset); 
+
+            const dateStr = today.toISOString().split('T')[0];
+
+            document.getElementById('datePicker').value = dateStr;
+
+            lastStableDate = dateStr;
+
+            const dateLabel = document.getElementById('loginTodayDate');
+            if (dateLabel) {
+                const now = new Date();
+                dateLabel.innerText = now.toLocaleDateString('de-CH', { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
+            }
+
+        });
+
+    </script>
+
+</body>
+
+</html> 
