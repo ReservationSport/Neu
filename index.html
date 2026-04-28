@@ -151,7 +151,7 @@
 
         .divider-thick { grid-column: 1 / span 6; height: 4px; background: #444; margin: 5px 0; }
 
-        .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; }
+        .extra-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1; pointer-events: none; display: none; }
 
     </style>
 
@@ -162,6 +162,7 @@
     <div id="loginOverlay">
 
         <h2>Reservation Sport</h2>
+        <div id="loginTodayDate" style="margin-top:-18px;margin-bottom:22px;color:#d1d1d1;font-size:16px;"></div>
 
         <input type="text" id="kuerzelInput" placeholder="Kürzel" oninput="document.getElementById('loginError').innerText=''">
 
@@ -255,6 +256,8 @@
                 sel.style.pointerEvents = "none";
 
                 sel.style.opacity = "0";
+                sel.style.display = "none";
+                if (sel.blur) sel.blur();
 
             });
 
@@ -380,48 +383,53 @@
 
                 const [y, m, d] = dateVal.split('-').map(Number);
 
+                // Performance: schnelle Lookups + Option-Parts nur einmal vorbereiten
+                const myClassesSet = new Set(myClasses.map(c => String(c).trim()));
+                const optionMeta = options.map(o => {
+                    const name = o[0];
+                    const parts = String(name).split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
+                    return { name, parts };
+                });
                 
+
+                // Performance: HTML zuerst im Speicher aufbauen und einmalig setzen (verhindert viele Reflows).
+                let html = "";
 
                 data.forEach((row, rowIndex) => {
 
                     if (rowIndex === 0) {
 
-                        container.innerHTML += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
+                        html += `<div class="box header-row"><span>${wtArr[dateObj.getDay()]}, ${d}.${m}.${y}</span><div class="save-container"><div id="sport-loader" class="sport-loader">🏀</div><button id="saveBtn" class="save-btn" onclick="saveChanges()">SPEICHERN</button></div></div>`;
 
                     } else {
 
-                        if (rowIndex === 4 || rowIndex === 10) container.innerHTML += `<div class="divider-thin"></div>`;
+                        if (rowIndex === 4 || rowIndex === 10) html += `<div class="divider-thin"></div>`;
 
-                        if (rowIndex === 7) container.innerHTML += `<div class="divider-thick"></div>`;
+                        if (rowIndex === 7) html += `<div class="divider-thick"></div>`;
 
-                        container.innerHTML += `<div class="box zeit-box">${row[0]}</div>`;
+                        html += `<div class="box zeit-box">${row[0]}</div>`;
 
                         
+
+                        // Pro Zeile einmalig belegte Parts je Slot vorbereiten (verhindert viele split/filter in Options-Filter)
+                        const belegtePartsBySlot = {};
+                        for (let k = 1; k <= 5; k++) {
+                            let otherVal = String(row[k] || "").trim();
+                            if (otherVal !== "") {
+                                let resPart = otherVal.split(' | ')[1] || "";
+                                if (resPart && resPart !== "Ausfall" && resPart !== "Outdoor") {
+                                    belegtePartsBySlot[k] = String(resPart).split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
+                                }
+                            }
+                        }
 
                         for(let i = 1; i <= 5; i++) {
 
                             // BELEGUNG PRÜFEN (für diesen spezifischen Slot i)
-
-                            let belegteHallenInZeileOhneMich = [];
-
+                            const otherBelegteParts = [];
                             for (let k = 1; k <= 5; k++) {
-
-                                if (k === i) continue; // Den eigenen Slot ignorieren!
-
-                                let otherVal = String(row[k] || "").trim();
-
-                                if (otherVal !== "") {
-
-                                    let resPart = otherVal.split(' | ')[1] || "";
-
-                                    if (resPart && resPart !== "Ausfall" && resPart !== "Outdoor") {
-
-                                        belegteHallenInZeileOhneMich.push(resPart);
-
-                                    }
-
-                                }
-
+                                if (k === i) continue;
+                                if (belegtePartsBySlot[k]) otherBelegteParts.push(belegtePartsBySlot[k]);
                             }
 
 
@@ -431,14 +439,14 @@
 
                             let isOutdoor = (res === "Outdoor");
 
-                            let canEdit = myClasses.some(c => klasse.trim() === c.trim());
+                            let canEdit = myClassesSet.has(klasse.trim());
 
                             let stiftHtml = (kommentar.startsWith("KOMMENTAR:")) ? `<span class="stift" onclick="event.stopPropagation(); alert('Notiz: ${kommentar.replace('KOMMENTAR:', '')}')"><i class="fas fa-comment-dots"></i></span>` : "";
 
                             let teacher = klasse.split('/').map(k => allClassTeachers[k.trim()] || "").filter(t => t !== "").join(" / ");
 
 
-                            container.innerHTML += `
+                            html += `
 
                             <div class="box ${klasse.trim() === "" ? 'empty' : ''} ${!canEdit ? 'not-mine' : 'is-mine'} ${isAusfall ? 'ausfall-mode' : ''} ${isOutdoor ? 'outdoor-mode' : ''}" 
 
@@ -459,30 +467,20 @@
                                    <select onclick="event.stopPropagation()" onchange="addChange(this, '${row[0]}', ${i}, '${klasse}');">
 
                                        <option value="">---</option>
+                                       ${(res === "Outdoor" || res === "Ausfall") ? `<option value="${res}" selected style="display:none">${res}</option>` : ``}
 
-                                       ${options.filter(o => {
-
-                                           const optName = o[0];
-
+                                       ${optionMeta.filter(({name, parts}) => {
                                            // Wenn es die aktuell gewählte Option ist, immer anzeigen
-
-                                           if (res === optName) return true;
-
+                                           if (res === name) return true;
                                            // Prüfen ob Teile dieser Option bereits von KOLLEGEN belegt sind
-
-                                           let istGesperrt = belegteHallenInZeileOhneMich.some(belegt => {
-
-                                               let belegtParts = belegt.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
-
-                                               let optParts = optName.split(/[\s+]+/).filter(p => p.length > 0 && p !== "Halle");
-
-                                               return optParts.some(p => belegtParts.includes(p));
-
-                                           });
-
-                                           return !istGesperrt;
-
-                                       }).map(o => `<option value="${o[0]}" ${res === o[0] ? 'selected' : ''}>${o[0]}</option>`).join('')}
+                                           for (let b = 0; b < otherBelegteParts.length; b++) {
+                                               const belegtParts = otherBelegteParts[b];
+                                               for (let p = 0; p < parts.length; p++) {
+                                                   if (belegtParts.includes(parts[p])) return false;
+                                               }
+                                           }
+                                           return true;
+                                       }).map(({name}) => `<option value="${name}" ${res === name ? 'selected' : ''}>${name}</option>`).join('')}
 
                                    </select>
 
@@ -507,6 +505,8 @@
                     }
 
                 });
+
+                container.innerHTML = html;
 
             } catch(e) { console.error(e); }
 
@@ -564,6 +564,42 @@
             let pureRes = parent.querySelector('.res').innerText.trim();
 
             let finalVal = "";
+            const ensureHiddenOption = (sel, value) => {
+                if (!sel) return;
+                let opt = sel.querySelector(`option[value="${value}"]`);
+                if (!opt) {
+                    opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = value;
+                    opt.hidden = true;
+                    sel.appendChild(opt);
+                }
+            };
+
+            // Wenn im Extra-Menü "---" gewählt wird: Outdoor/Ausfall entfernen (und als Änderung speichern).
+            if (action === "") {
+                if (pureRes === "Outdoor" || pureRes === "Ausfall") {
+                    parent.classList.remove('ausfall-mode', 'outdoor-mode');
+                    parent.style.backgroundColor = "";
+                    parent.querySelector('.res').innerText = "";
+
+                    const mainSelect = parent.querySelector('select:not(.extra-select)');
+                    if (mainSelect) mainSelect.value = "";
+
+                    const comment = getExistingComment(r, c);
+                    finalVal = klasse + (comment ? " | " + comment : "");
+                }
+
+                if (finalVal) {
+                    if (!currentPlanData[r]) currentPlanData[r] = [];
+                    currentPlanData[r][c] = finalVal;
+                    pendingChanges.push({ time, slotIndex: slot, val: finalVal });
+                    document.getElementById('saveBtn').style.display = 'block';
+                }
+
+                closeAllExtraMenus(); el.value = "";
+                return;
+            }
 
             if (action === "outdoor") {
 
@@ -574,6 +610,8 @@
                 parent.style.backgroundColor = "";
 
                 parent.querySelector('.res').innerText = "Outdoor";
+                const mainSelect = parent.querySelector('select:not(.extra-select)');
+                if (mainSelect) { ensureHiddenOption(mainSelect, "Outdoor"); mainSelect.value = "Outdoor"; }
 
                 let comment = getExistingComment(r, c);
 
@@ -588,6 +626,8 @@
                 parent.style.backgroundColor = "";
 
                 parent.querySelector('.res').innerText = "Ausfall"; 
+                const mainSelect = parent.querySelector('select:not(.extra-select)');
+                if (mainSelect) { ensureHiddenOption(mainSelect, "Ausfall"); mainSelect.value = "Ausfall"; }
 
                 let comment = getExistingComment(r, c);
 
@@ -643,6 +683,7 @@
             closeAllExtraMenus();
 
             const sel = el.querySelector('.extra-select'); 
+            const currentRes = (el.querySelector('.res')?.innerText || "").trim();
 
             const hatStift = el.querySelector('.stift') !== null;
 
@@ -650,6 +691,12 @@
 
             if(delOpt) delOpt.style.display = hatStift ? "block" : "none";
 
+            // Beim Öffnen den aktuellen Zustand vorselektieren, damit nicht immer "---" im Fokus ist.
+            if (currentRes === "Outdoor") sel.value = "outdoor";
+            else if (currentRes === "Ausfall") sel.value = "ausfall";
+            else sel.value = "";
+
+            sel.style.display = "block";
             sel.style.zIndex = "100"; 
 
             sel.style.pointerEvents = "all"; 
@@ -757,6 +804,12 @@
             document.getElementById('datePicker').value = dateStr;
 
             lastStableDate = dateStr;
+
+            const dateLabel = document.getElementById('loginTodayDate');
+            if (dateLabel) {
+                const now = new Date();
+                dateLabel.innerText = now.toLocaleDateString('de-CH', { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
+            }
 
         });
 
